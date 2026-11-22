@@ -861,7 +861,8 @@ class CubeKind extends MoveKind {
           if (coord * sign < n - 1) continue;
           final np = _rot(p, axis, pos), nn = _rot(_normals[f], axis, pos);
           final (tf, tc, tr) = _locate(np, nn, n);
-          final (sx, sy) = _facePos[f], (dx, dy) = _facePos[tf];
+          final (sx, sy) = _facePos[f];
+          final (dx, dy) = _facePos[tf];
           out[(dy * n + tr) * w + dx * n + tc] = cells[(sy * n + row) * w + sx * n + col];
         }
       }

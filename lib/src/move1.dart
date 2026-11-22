@@ -727,7 +727,6 @@ class PegJumpKind extends MoveKind {
         if ((x < 2 || x > 4) && (y < 2 || y > 4)) cells[i] = -1;
       }
     }
-    final probe = PLevel(kind: id, w: n, h: n, clues: const [], givens: const []);
     // tek taştan geriye doğru zıplamalar
     final valid = [for (var i = 0; i < n * n; i++) if (cells[i] == 0) i];
     final start = valid[r.nextInt(valid.length)];

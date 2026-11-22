@@ -1141,3 +1141,68 @@ class TogglesKind extends PuzzleKind {
 
 /// Toggles için başlangıç durumunu ipuçlarından kur (PState.empty yerine).
 PState togglesStart(PLevel lv) => PState(List.of(lv.clues), List.filled(lv.linkCount, 0), List.filled(lv.borderCount, 0));
+
+// ======================================================================
+// Sekiz vezir
+
+/// n×n tahtaya n vezir yerleştir: hiçbiri bir başkasını (satır, sütun,
+/// çapraz) tehdit etmesin. Bazı vezirler verilir.
+class QueensKind extends ShadeKind {
+  const QueensKind();
+  @override
+  String get id => 'sekiz-vezir';
+
+  @override
+  Mark get onMark => Mark.gem;
+
+  @override
+  bool ok(PLevel lv, PState s, bool complete) {
+    final v = s.cells;
+    final n = lv.w;
+    final q = [for (var i = 0; i < lv.n; i++) if (v[i] == 1) i];
+    for (var a = 0; a < q.length; a++) {
+      for (var b = a + 1; b < q.length; b++) {
+        final ax = q[a] % n, ay = q[a] ~/ n, bx = q[b] % n, by = q[b] ~/ n;
+        if (ax == bx || ay == by || (ax - bx).abs() == (ay - by).abs()) return false;
+      }
+    }
+    for (var y = 0; y < n; y++) {
+      var on = 0, unk = 0;
+      for (var x = 0; x < n; x++) {
+        if (v[y * n + x] == 1) on++;
+        if (v[y * n + x] < 0) unk++;
+      }
+      if (on + unk < 1) return false;
+    }
+    return !complete || q.length == n;
+  }
+
+  @override
+  PLevel make(int difficulty, SeededRandom r) {
+    final n = const [5, 5, 6, 6, 7, 7, 8, 8, 9, 10][difficulty - 1];
+    final cols = List.filled(n, -1);
+    bool go(int y) {
+      if (y == n) return true;
+      for (final x in shuffled(n, r)) {
+        var okk = true;
+        for (var yy = 0; yy < y; yy++) {
+          if (cols[yy] == x || (cols[yy] - x).abs() == y - yy) {
+            okk = false;
+            break;
+          }
+        }
+        if (!okk) continue;
+        cols[y] = x;
+        if (go(y + 1)) return true;
+      }
+      return false;
+    }
+
+    go(0);
+    final v = List.filled(n * n, 0);
+    for (var y = 0; y < n; y++) {
+      v[y * n + cols[y]] = 1;
+    }
+    return PLevel(kind: id, w: n, h: n, clues: const [], solCells: v, givens: List.filled(n * n, -1));
+  }
+}

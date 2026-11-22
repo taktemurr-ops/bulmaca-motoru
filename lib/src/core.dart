@@ -651,7 +651,15 @@ class PuzzleRules extends GameRules<PLevel> {
   final int levels;
   final bool unique;
 
-  PuzzleRules({required this.gameId, required this.kindFor, this.levels = 100000, this.unique = true});
+  /// Zorluğu türün üretimine aktarmadan önce dönüştür (çeşit paketleri).
+  final int Function(int d)? diffMap;
+
+  PuzzleRules({required this.gameId, required this.kindFor, this.levels = 100000, this.unique = true, this.diffMap});
+
+  int mapDifficulty(int d) => (diffMap?.call(d) ?? d).clamp(1, 10);
+
+  /// Bölüm zorluğu için tür (ekranda kullanılır).
+  PuzzleKind kindForLevel(int d) => kindFor(mapDifficulty(d));
 
   @override
   int get levelCount => levels;
@@ -676,15 +684,16 @@ class PuzzleRules extends GameRules<PLevel> {
 
   @override
   PLevel generate(LevelSpec spec) {
-    final k = kindFor(spec.difficulty);
+    final d = mapDifficulty(spec.difficulty);
+    final k = kindFor(d);
     final r = SeededRandom(mixSeed([spec.seed, 7331]));
-    final lv = k.make(spec.difficulty, r);
-    return unique ? finishWithGivens(k, lv, spec.difficulty, r) : lv;
+    final lv = k.make(d, r);
+    return unique ? finishWithGivens(k, lv, d, r) : lv;
   }
 
   @override
   Validation validate(PLevel puzzle, LevelSpec spec) {
-    final k = kindFor(spec.difficulty);
+    final k = kindFor(mapDifficulty(spec.difficulty));
     final sol = PState(
       puzzle.solCells.isEmpty ? List.filled(puzzle.n, 0) : List.of(puzzle.solCells),
       puzzle.solLinks.isEmpty ? List.filled(puzzle.linkCount, 0) : List.of(puzzle.solLinks),

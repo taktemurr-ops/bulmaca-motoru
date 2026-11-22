@@ -13,8 +13,8 @@ import 'texts.dart';
 /// Bütün ızgara bulmacaları için ortak ekran.
 class PuzzleView extends StatefulWidget {
   final PlayContext ctx;
-  final PuzzleKind Function(int difficulty) kindFor;
-  const PuzzleView({super.key, required this.ctx, required this.kindFor});
+  final PuzzleRules rules;
+  const PuzzleView({super.key, required this.ctx, required this.rules});
 
   @override
   State<PuzzleView> createState() => _PuzzleViewState();
@@ -41,7 +41,7 @@ class _PuzzleViewState extends State<PuzzleView> {
   void initState() {
     super.initState();
     lv = (ctx.generated as GeneratedLevel<PLevel>).puzzle;
-    kind = widget.kindFor(ctx.spec.difficulty);
+    kind = widget.rules.kindForLevel(ctx.spec.difficulty);
     final snap = ctx.resume['snap'];
     st = (snap is String ? PState.restore(snap, lv) : null) ?? kind.initial(lv);
     _seconds = (ctx.resume['secs'] as num?)?.toInt() ?? 0;

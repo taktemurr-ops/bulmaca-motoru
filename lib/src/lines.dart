@@ -924,10 +924,13 @@ class BridgeKind extends PuzzleKind {
 /// geçer; delikler -2.
 class PathLinkKind extends PuzzleKind {
   final bool single;
-  const PathLinkKind({this.single = false});
+
+  /// Bütün hücreler dolmalı mı (renk akışı); değilse boş hücre kalabilir.
+  final bool fill;
+  const PathLinkKind({this.single = false, this.fill = true});
 
   @override
-  String get id => single ? 'tek-cizgi' : 'sayi-baglama';
+  String get id => single ? 'tek-cizgi' : (fill ? 'renk-akisi' : 'sayi-baglama');
 
   @override
   CellInput get cellInput => CellInput.none;
@@ -947,7 +950,7 @@ class PathLinkKind extends PuzzleKind {
     if (c == -2) return const CellLook(mark: Mark.wall);
     if (c > 0) {
       if (single) return CellLook(mark: c == 1 ? Mark.disc : Mark.ring);
-      return CellLook(color: 1 + (c - 1) % 9, text: '$c', tone: 1);
+      return fill ? CellLook(color: 1 + (c - 1) % 9) : CellLook(text: '$c', tone: 1, mark: Mark.ring);
     }
     return const CellLook();
   }
@@ -988,6 +991,10 @@ class PathLinkKind extends PuzzleKind {
         continue;
       }
       final want = end ? 1 : 2;
+      if (!fill && !end) {
+        if (d > 2 || (d == 1 && u == 0)) return false;
+        continue;
+      }
       if (d > want || d + u < want) return false;
     }
     // bileşenlerde farklı uçlar ve döngü olmamalı
@@ -1016,6 +1023,16 @@ class PathLinkKind extends PuzzleKind {
       final prev = endOf[root];
       if (prev != null && prev != key) return false;
       endOf[root] = key;
+    }
+    if (complete && !fill) {
+      final ends = <int, List<int>>{};
+      for (var i = 0; i < lv.n; i++) {
+        if (lv.clues[i] > 0) ends.putIfAbsent(lv.clues[i], () => []).add(find(i));
+      }
+      for (final e in ends.values) {
+        if (e.length != 2 || e[0] != e[1]) return false;
+      }
+      return true;
     }
     if (complete) {
       // her yol iki ucu birleştirir: bileşen sayısı = yol sayısı

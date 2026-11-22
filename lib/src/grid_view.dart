@@ -496,8 +496,10 @@ class _PuzzleViewState extends State<PuzzleView> {
     final digits = kind.cellInput == CellInput.digits;
     final colors = kind.cellInput == CellInput.colors;
     return Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      Container(
+        margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        padding: const EdgeInsets.only(left: 10),
+        decoration: BoxDecoration(color: scheme.surface.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(16)),
         child: Row(children: [
           Icon(Icons.timer_outlined, size: 18, color: scheme.onSurface.withValues(alpha: 0.7)),
           const SizedBox(width: 4),
@@ -575,7 +577,7 @@ class _PuzzleViewState extends State<PuzzleView> {
         children: [
           for (final v in values)
             SizedBox(
-              width: values.length > 12 ? 38 : (max > 9 ? 40 : 44),
+              width: values.length > 12 ? 34 : (values.length > 8 ? 34 : 44),
               height: 46,
               child: FilledButton.tonal(
                 style: FilledButton.styleFrom(padding: EdgeInsets.zero),
@@ -584,10 +586,10 @@ class _PuzzleViewState extends State<PuzzleView> {
               ),
             ),
           SizedBox(
-            width: 52,
+            width: 44,
             height: 46,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+            child: FilledButton.tonal(
+              style: FilledButton.styleFrom(padding: EdgeInsets.zero),
               onPressed: () {
                 final i = _sel;
                 if (i == null || _locked(i) || st.cells[i] == 0) return;
@@ -617,7 +619,8 @@ class _PuzzleViewState extends State<PuzzleView> {
               decoration: BoxDecoration(
                 color: puzzleColor(v),
                 shape: BoxShape.circle,
-                border: Border.all(color: v == _brush ? scheme.onSurface : Colors.transparent, width: 3),
+                border: Border.all(color: v == _brush ? Colors.white : Colors.white24, width: v == _brush ? 4 : 1),
+                boxShadow: v == _brush ? const [BoxShadow(color: Colors.black54, blurRadius: 6)] : null,
               ),
               child: ctx.colorBlind ? Center(child: Text('$v', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))) : null,
             ),
@@ -676,6 +679,12 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas c, Size size) {
     final board = Rect.fromLTWH(origin.dx, origin.dy, lv.w * cs, lv.h * cs);
+    final (pt, pl, pb, pr) = kind.margins(lv);
+    if (pt + pl + pb + pr > 0) {
+      // İpuçları koyu mürekkeple yazılır: koyu dünya arka planında da okunsun diye kenar şeridi açık zemin.
+      final outer = Rect.fromLTRB(board.left - pl * cs, board.top - pt * cs, board.right + pr * cs, board.bottom + pb * cs);
+      c.drawRRect(RRect.fromRectAndRadius(outer.inflate(cs * 0.12), Radius.circular(cs * 0.25)), Paint()..color = paper.withValues(alpha: 0.9));
+    }
     c.drawRRect(RRect.fromRectAndRadius(board.inflate(cs * 0.08), Radius.circular(cs * 0.18)), Paint()..color = paper);
     // Bölge tonları
     if (kind.tintRegions && lv.regions.isNotEmpty) {

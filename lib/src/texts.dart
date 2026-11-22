@@ -1,0 +1,20 @@
+import 'package:studio_core/core/strings.dart';
+
+/// bulmaca-motoru'nun kısa metinleri (33 dil). Sıra:
+/// tr en de es fr ar fa he ur ru uk pl cs ro hu el it pt nl sv da nb fi ja ko zh hi bn id ms th vi fil
+const Map<String, List<String>> kBulmacaTexts = {
+  'undo': ['Geri al', 'Undo', 'Rückgängig', 'Deshacer', 'Annuler', 'تراجع', 'واگرد', 'בטל', 'واپس', 'Отменить', 'Скасувати', 'Cofnij', 'Zpět', 'Anulează', 'Visszavonás', 'Αναίρεση', 'Annulla', 'Desfazer', 'Ongedaan', 'Ångra', 'Fortryd', 'Angre', 'Kumoa', '戻す', '되돌리기', '撤销', 'वापस', 'ফেরত', 'Urungkan', 'Buat asal', 'เลิกทำ', 'Hoàn tác', 'I-undo'],
+  'clear': ['Temizle', 'Clear', 'Leeren', 'Borrar', 'Effacer', 'مسح', 'پاک کن', 'נקה', 'صاف کریں', 'Очистить', 'Очистити', 'Wyczyść', 'Vymazat', 'Șterge', 'Törlés', 'Καθαρισμός', 'Pulisci', 'Limpar', 'Wissen', 'Rensa', 'Ryd', 'Tøm', 'Tyhjennä', 'クリア', '지우기', '清空', 'साफ़ करें', 'মুছুন', 'Bersihkan', 'Kosongkan', 'ล้าง', 'Xóa hết', 'I-clear'],
+  'hint': ['İpucu', 'Hint', 'Tipp', 'Pista', 'Indice', 'تلميح', 'راهنما', 'רמז', 'اشارہ', 'Подсказка', 'Підказка', 'Podpowiedź', 'Nápověda', 'Indiciu', 'Tipp', 'Βοήθεια', 'Aiuto', 'Dica', 'Hint', 'Ledtråd', 'Hint', 'Hint', 'Vihje', 'ヒント', '힌트', '提示', 'संकेत', 'সংকেত', 'Petunjuk', 'Petunjuk', 'คำใบ้', 'Gợi ý', 'Pahiwatig'],
+  'erase': ['Sil', 'Erase', 'Löschen', 'Borrar', 'Gommer', 'امسح', 'پاک', 'מחק', 'مٹائیں', 'Стереть', 'Стерти', 'Usuń', 'Smazat', 'Șterge', 'Radír', 'Σβήσιμο', 'Cancella', 'Apagar', 'Gum', 'Sudda', 'Slet', 'Slett', 'Pyyhi', '消す', '지우기', '擦除', 'मिटाएँ', 'মুছে দিন', 'Hapus', 'Padam', 'ลบ', 'Xóa', 'Burahin'],
+  'notes': ['Not', 'Notes', 'Notizen', 'Notas', 'Notes', 'ملاحظات', 'یادداشت', 'הערות', 'نوٹس', 'Заметки', 'Нотатки', 'Notatki', 'Poznámky', 'Note', 'Jegyzet', 'Σημειώσεις', 'Note', 'Notas', 'Notities', 'Anteckningar', 'Noter', 'Notater', 'Muistiinpanot', 'メモ', '메모', '笔记', 'नोट्स', 'নোট', 'Catatan', 'Nota', 'โน้ต', 'Ghi chú', 'Tala'],
+  'moves': ['Hamle', 'Moves', 'Züge', 'Movimientos', 'Coups', 'الحركات', 'حرکت‌ها', 'מהלכים', 'چالیں', 'Ходы', 'Ходи', 'Ruchy', 'Tahy', 'Mutări', 'Lépések', 'Κινήσεις', 'Mosse', 'Jogadas', 'Zetten', 'Drag', 'Træk', 'Trekk', 'Siirrot', '手数', '이동', '步数', 'चालें', 'চাল', 'Langkah', 'Langkah', 'จำนวนครั้ง', 'Nước đi', 'Galaw'],
+  'restart': ['Baştan', 'Restart', 'Neu starten', 'Reiniciar', 'Recommencer', 'إعادة', 'از نو', 'התחל מחדש', 'دوبارہ', 'Заново', 'Заново', 'Od nowa', 'Znovu', 'Reîncepe', 'Újra', 'Από την αρχή', 'Ricomincia', 'Recomeçar', 'Opnieuw', 'Börja om', 'Forfra', 'Start på nytt', 'Alusta', 'やり直し', '다시 시작', '重来', 'फिर से', 'আবার', 'Ulangi', 'Mula semula', 'เริ่มใหม่', 'Chơi lại', 'Ulitin'],
+  'target': ['Hedef', 'Target', 'Ziel', 'Meta', 'Objectif', 'الهدف', 'هدف', 'יעד', 'ہدف', 'Цель', 'Мета', 'Cel', 'Cíl', 'Țintă', 'Cél', 'Στόχος', 'Obiettivo', 'Meta', 'Doel', 'Mål', 'Mål', 'Mål', 'Tavoite', '目標', '목표', '目标', 'लक्ष्य', 'লক্ষ্য', 'Target', 'Sasaran', 'เป้าหมาย', 'Mục tiêu', 'Layunin'],
+  'left': ['Kalan', 'Left', 'Übrig', 'Quedan', 'Restant', 'المتبقي', 'باقی', 'נותרו', 'باقی', 'Осталось', 'Залишилось', 'Zostało', 'Zbývá', 'Rămase', 'Maradt', 'Απομένουν', 'Rimasti', 'Restam', 'Over', 'Kvar', 'Tilbage', 'Igjen', 'Jäljellä', '残り', '남음', '剩余', 'बाकी', 'বাকি', 'Sisa', 'Baki', 'เหลือ', 'Còn lại', 'Natitira'],
+  'tries': ['Deneme', 'Tries', 'Versuche', 'Intentos', 'Essais', 'المحاولات', 'تلاش', 'ניסיונות', 'کوششیں', 'Попытки', 'Спроби', 'Próby', 'Pokusy', 'Încercări', 'Próbák', 'Προσπάθειες', 'Tentativi', 'Tentativas', 'Pogingen', 'Försök', 'Forsøg', 'Forsøk', 'Yritykset', '試行', '시도', '尝试', 'प्रयास', 'চেষ্টা', 'Percobaan', 'Cubaan', 'ครั้งที่ลอง', 'Lượt thử', 'Subok'],
+  'check': ['Dene', 'Check', 'Prüfen', 'Comprobar', 'Vérifier', 'تحقق', 'بررسی', 'בדוק', 'جانچیں', 'Проверить', 'Перевірити', 'Sprawdź', 'Zkontrolovat', 'Verifică', 'Ellenőrzés', 'Έλεγχος', 'Verifica', 'Verificar', 'Controleer', 'Kontrollera', 'Tjek', 'Sjekk', 'Tarkista', 'チェック', '확인', '检查', 'जाँचें', 'যাচাই', 'Periksa', 'Semak', 'ตรวจ', 'Kiểm tra', 'Suriin'],
+};
+
+/// Kısa metni dile göre seç.
+String bt(String lang, String key) => Strings.pick(kBulmacaTexts[key]!, lang);

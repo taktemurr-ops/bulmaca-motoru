@@ -1,0 +1,20 @@
+name: bulmaca_motoru
+description: "Bulmaca ve Sayı ailesinin ortak motoru: ızgara bulmacaları, çözücü, bölüm üretimi ve genel ekran."
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  studio_core:
+    git:
+      url: https://github.com/taktemurr-ops/studio-core
+      ref: 293a3eda102647b57c23e670d800d91b48d32f0b
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

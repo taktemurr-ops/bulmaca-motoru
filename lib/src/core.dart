@@ -208,7 +208,10 @@ class PLevel {
 /// Oyuncunun (ya da çözücünün) durumu. Çözücüde -1 bilinmeyen demektir.
 class PState {
   final List<int> cells, links, borders;
-  PState(this.cells, this.links, this.borders);
+
+  /// Türe özgü ek durum (hamle oyunları: seçim, sayaç, rastgele durum).
+  final List<int> aux;
+  PState(this.cells, this.links, this.borders, [List<int>? aux]) : aux = aux ?? <int>[];
 
   factory PState.empty(PLevel lv, {int fill = 0}) => PState(
         [for (var i = 0; i < lv.n; i++) lv.givens.isNotEmpty && lv.givens[i] >= 0 ? lv.givens[i] : fill],
@@ -216,15 +219,15 @@ class PState {
         [for (var i = 0; i < lv.borderCount; i++) lv.givenBorders.isNotEmpty && lv.givenBorders[i] >= 0 ? lv.givenBorders[i] : fill],
       );
 
-  PState copy() => PState(List.of(cells), List.of(links), List.of(borders));
+  PState copy() => PState(List.of(cells), List.of(links), List.of(borders), List.of(aux));
 
-  String serialize() => '${cells.join(',')}|${links.join(',')}|${borders.join(',')}';
+  String serialize() => '${cells.join(',')}|${links.join(',')}|${borders.join(',')}|${aux.join(',')}';
 
   static PState? restore(String s, PLevel lv) {
     final p = s.split('|');
-    if (p.length != 3) return null;
+    if (p.length != 3 && p.length != 4) return null;
     List<int> parse(String t) => t.isEmpty ? <int>[] : [for (final v in t.split(',')) int.tryParse(v) ?? 0];
-    final st = PState(parse(p[0]), parse(p[1]), parse(p[2]));
+    final st = PState(parse(p[0]), parse(p[1]), parse(p[2]), p.length == 4 ? parse(p[3]) : null);
     if (st.cells.length != lv.n || st.links.length != lv.linkCount || st.borders.length != lv.borderCount) return null;
     return st;
   }
@@ -376,6 +379,35 @@ abstract class PuzzleKind {
   /// Hücreye dokunmak bağları değil hücreyi değiştirir mi.
   bool tapCell(PLevel lv, int i) => cellInput != CellInput.none && (lv.givens.isEmpty || lv.givens[i] < 0) && (lv.clues.isEmpty || lv.clues[i] < 0 || cluesEditable);
 
+  // ---- hamle oyunları
+  /// Hamle türü: dokunma, kaydırma ve sürükleme doğrudan türe gider.
+  bool get actionMode => false;
+
+  /// Hücreye dokunma; durum değiştiyse true.
+  bool act(PLevel lv, PState s, int i) => false;
+
+  /// Uzun basma.
+  bool actAlt(PLevel lv, PState s, int i) => false;
+
+  /// Izgara dışındaki ipucu alanına dokunma (side: 0 üst, 1 sol, 2 alt, 3 sağ).
+  bool actOutside(PLevel lv, PState s, int side, int index) => false;
+
+  /// Kaydırma (0 yukarı, 1 sağ, 2 aşağı, 3 sol).
+  bool swipe(PLevel lv, PState s, int dir) => false;
+
+  /// Bir hücreden diğerine sürükleme.
+  bool dragMove(PLevel lv, PState s, int from, int to) => false;
+
+  /// Sürüklenen hücre yolu (komşu hücreler) ile hamle.
+  bool get pathInput => false;
+  bool pathMove(PLevel lv, PState s, List<int> path) => false;
+
+  /// Çapraz komşular da yola eklenebilir mi.
+  bool get pathDiagonal => false;
+
+  /// Kaybedildi mi (ör. mayına basmak).
+  bool failed(PLevel lv, PState s) => false;
+
   /// Oyunun başlangıç durumu.
   PState initial(PLevel lv) => PState.empty(lv);
 
@@ -407,6 +439,9 @@ abstract class PuzzleKind {
     s.cells[i] = (s.cells[i] + 1) % cellStates(lv);
   }
 }
+
+/// Son sayımda bulunan çözümler (verilen seçimi için; en çok iki).
+final List<PState> lastFoundSolutions = [];
 
 /// Genel geri izlemeli çözücü: değişkenleri sırayla dener, her adımda
 /// [PuzzleKind.ok] ile budar.
@@ -442,6 +477,7 @@ int? genericCount(PuzzleKind k, PLevel lv, {int limit = 2, int budget = 200000})
   final linkDom = k.linkDomain(lv), borderDom = k.borderDomain(lv);
   List<int> listOf(int layer) => layer == 0 ? s.cells : (layer == 1 ? s.links : s.borders);
   List<int> domOf(int layer, int i) => layer == 0 ? cellDom[i] : (layer == 1 ? linkDom : borderDom);
+  lastFoundSolutions.clear();
   if (!k.ok(lv, s, vars.isEmpty)) return 0;
   var count = 0, calls = 0;
   var over = false;
@@ -505,7 +541,10 @@ int? genericCount(PuzzleKind k, PLevel lv, {int limit = 2, int budget = 200000})
       }
     }
     if (pick == null) {
-      if (k.ok(lv, s, true)) count++;
+      if (k.ok(lv, s, true)) {
+        count++;
+        if (lastFoundSolutions.length < 2) lastFoundSolutions.add(s.copy());
+      }
       undo(trail);
       return;
     }
@@ -569,6 +608,26 @@ PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r,
       return extra > 0 ? build() : cur;
     }
     if (c == 0) break; // olmamalı
+    // Çok çözümlü: iki çözümün ayrıldığı bir yeri ver.
+    if (c == 2 && lastFoundSolutions.length >= 2 && given < maxGive) {
+      final a = lastFoundSolutions[0], b = lastFoundSolutions[1];
+      final la = layer == 0 ? a.cells : (layer == 1 ? a.links : a.borders);
+      final lb = layer == 0 ? b.cells : (layer == 1 ? b.links : b.borders);
+      int? pick;
+      for (final i in order.reversed) {
+        if (i < la.length && i < lb.length && la[i] != lb[i]) {
+          pick = i;
+          break;
+        }
+      }
+      if (pick != null) {
+        order.remove(pick);
+        g[pick] = sol[pick];
+        given++;
+        cur = build();
+        continue;
+      }
+    }
     // Belirsiz ya da çok çözümlü: birkaç verilen ekle.
     final step = c == null ? 3 : 1;
     var added = 0;

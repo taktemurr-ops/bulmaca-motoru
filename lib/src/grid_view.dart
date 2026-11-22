@@ -70,6 +70,15 @@ class _PuzzleViewState extends State<PuzzleView> {
   void _changed() {
     _moves++;
     _persist();
+    if (kind.failed(lv, st)) {
+      _ended = true;
+      ctx.sfx(Sfx.lose);
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (!mounted) return;
+        ctx.finish(RoundResult(won: false, seconds: _seconds, moves: _moves, hintsUsed: _hints));
+      });
+      return;
+    }
     if (kind.solved(lv, st)) {
       _ended = true;
       ctx.sfx(Sfx.win);
@@ -101,6 +110,74 @@ class _PuzzleViewState extends State<PuzzleView> {
     return y * lv.w + x;
   }
 
+  /// Izgara dışındaki dokunuş: (taraf, sıra).
+  (int, int)? _outsideAt(Offset p) {
+    final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _cs;
+    if (fx >= 0 && fx < lv.w && fy < 0 && fy > -2.5) return (0, fx.floor());
+    if (fx >= 0 && fx < lv.w && fy >= lv.h && fy < lv.h + 2.5) return (2, fx.floor());
+    if (fy >= 0 && fy < lv.h && fx < 0 && fx > -2.5) return (1, fy.floor());
+    if (fy >= 0 && fy < lv.h && fx >= lv.w && fx < lv.w + 2.5) return (3, fy.floor());
+    return null;
+  }
+
+  Offset? _panOrigin, _panLast;
+  final _path = <int>[];
+
+  void _actPanStart(Offset p) {
+    _panOrigin = p;
+    _panLast = p;
+    _path.clear();
+    final i = _cellAt(p);
+    if (i != null) _path.add(i);
+  }
+
+  void _actPanUpdate(Offset p) {
+    _panLast = p;
+    if (!kind.pathInput) return;
+    final i = _cellAt(p);
+    if (i == null || _path.isEmpty || _path.last == i) return;
+    final a = _path.last;
+    final dx = (i % lv.w - a % lv.w).abs(), dy = (i ~/ lv.w - a ~/ lv.w).abs();
+    final adj = kind.pathDiagonal ? (dx <= 1 && dy <= 1) : (dx + dy == 1);
+    if (!adj) return;
+    if (_path.length >= 2 && _path[_path.length - 2] == i) {
+      setState(() => _path.removeLast());
+      return;
+    }
+    if (_path.contains(i)) return;
+    setState(() => _path.add(i));
+  }
+
+  void _actPanEnd() {
+    final a = _panOrigin, b = _panLast;
+    _panOrigin = null;
+    if (a == null || b == null || _ended) return;
+    _push();
+    var changed = false;
+    if (kind.pathInput && _path.length >= 2) {
+      changed = kind.pathMove(lv, st, List.of(_path));
+    } else {
+      final from = _cellAt(a), to = _cellAt(b);
+      if (from != null && to != null && from != to) changed = kind.dragMove(lv, st, from, to);
+      if (!changed) {
+        final d = b - a;
+        if (d.distance > _cs * 0.35) {
+          final dir = d.dx.abs() > d.dy.abs() ? (d.dx > 0 ? 1 : 3) : (d.dy > 0 ? 2 : 0);
+          changed = kind.swipe(lv, st, dir);
+        }
+      }
+    }
+    _path.clear();
+    if (!changed) {
+      _undo.removeLast();
+      setState(() {});
+      return;
+    }
+    setState(() {});
+    ctx.sfx(Sfx.place);
+    _changed();
+  }
+
   /// En yakın kenar (dokunma kenara yeterince yakınsa).
   int? _edgeAt(Offset p) {
     final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _cs;
@@ -128,6 +205,25 @@ class _PuzzleViewState extends State<PuzzleView> {
   // ---- girdi
   void _tapAt(Offset p) {
     if (_ended) return;
+    if (kind.actionMode) {
+      final i = _cellAt(p);
+      _push();
+      bool changed;
+      if (i != null) {
+        changed = kind.act(lv, st, i);
+      } else {
+        final o = _outsideAt(p);
+        changed = o != null && kind.actOutside(lv, st, o.$1, o.$2);
+      }
+      if (!changed) {
+        _undo.removeLast();
+        return;
+      }
+      setState(() {});
+      ctx.sfx(Sfx.tap);
+      _changed();
+      return;
+    }
     if (kind.usesBorders) {
       final e = _edgeAt(p);
       if (e != null && !(kind.outerBordersFixed && _outer(e)) && (lv.givenBorders.isEmpty || lv.givenBorders[e] < 0)) {
@@ -243,6 +339,7 @@ class _PuzzleViewState extends State<PuzzleView> {
   }
 
   void _panStart(Offset p) {
+    if (kind.actionMode) return _actPanStart(p);
     _dragged = false;
     final i = _cellAt(p);
     _dragFrom = i;
@@ -265,6 +362,7 @@ class _PuzzleViewState extends State<PuzzleView> {
   }
 
   void _panUpdate(Offset p) {
+    if (kind.actionMode) return _actPanUpdate(p);
     final i = _cellAt(p);
     if (kind.nodeStyle) {
       _dragFrom = i;
@@ -299,6 +397,7 @@ class _PuzzleViewState extends State<PuzzleView> {
   }
 
   void _panEnd() {
+    if (kind.actionMode) return _actPanEnd();
     if (kind.nodeStyle) {
       final a = _bridgeFrom, b = _dragFrom;
       if (a != null && b != null && lv.clues[b] >= 0) _bridge(a, b);
@@ -407,7 +506,7 @@ class _PuzzleViewState extends State<PuzzleView> {
           Expanded(child: Text(status, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
           IconButton(tooltip: bt(lang, 'undo'), onPressed: _undo.isEmpty ? null : _undoMove, icon: const Icon(Icons.undo)),
           IconButton(tooltip: bt(lang, 'clear'), onPressed: _clear, icon: const Icon(Icons.restart_alt)),
-          IconButton(tooltip: bt(lang, 'hint'), onPressed: _hint, icon: const Icon(Icons.lightbulb_outline)),
+          if (kind.hintable) IconButton(tooltip: bt(lang, 'hint'), onPressed: _hint, icon: const Icon(Icons.lightbulb_outline)),
         ]),
       ),
       Expanded(
@@ -420,6 +519,20 @@ class _PuzzleViewState extends State<PuzzleView> {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (d) => _tapAt(d.localPosition),
+            onLongPressStart: kind.actionMode
+                ? (d) {
+                    final i = _cellAt(d.localPosition);
+                    if (i == null || _ended) return;
+                    _push();
+                    if (kind.actAlt(lv, st, i)) {
+                      setState(() {});
+                      ctx.sfx(Sfx.tap);
+                      _changed();
+                    } else {
+                      _undo.removeLast();
+                    }
+                  }
+                : null,
             onPanStart: (d) => _panStart(d.localPosition),
             onPanUpdate: (d) => _panUpdate(d.localPosition),
             onPanEnd: (_) => _panEnd(),
@@ -432,6 +545,7 @@ class _PuzzleViewState extends State<PuzzleView> {
                 cs: _cs,
                 origin: _origin,
                 sel: digits ? _sel : null,
+                path: List.of(_path),
                 ink: scheme.onSurface,
                 accent: ctx.pieceColors.isNotEmpty ? ctx.pieceColors[0] : scheme.primary,
                 accent2: ctx.pieceColors.length > 1 ? ctx.pieceColors[1] : scheme.tertiary,
@@ -534,6 +648,7 @@ class _GridPainter extends CustomPainter {
   final double cs;
   final Offset origin;
   final int? sel;
+  final List<int> path;
   final Color ink, accent, accent2, paper;
   final bool colorBlind;
   final String lang;
@@ -545,6 +660,7 @@ class _GridPainter extends CustomPainter {
     required this.cs,
     required this.origin,
     required this.sel,
+    required this.path,
     required this.ink,
     required this.accent,
     required this.accent2,
@@ -685,6 +801,15 @@ class _GridPainter extends CustomPainter {
       }
     }
     kind.paintOver(c, lv, st, cell, cs);
+    if (path.length >= 2) {
+      final pp = Paint()
+        ..color = accent.withValues(alpha: 0.6)
+        ..strokeWidth = cs * 0.14
+        ..strokeCap = StrokeCap.round;
+      for (var k = 0; k + 1 < path.length; k++) {
+        c.drawLine(cell(path[k]).center, cell(path[k + 1]).center, pp);
+      }
+    }
     // Dış ipuçları
     final (mt, ml, mb, mr) = kind.margins(lv);
     for (var side = 0; side < 4; side++) {

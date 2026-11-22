@@ -21,10 +21,15 @@ void main() {
           p.solLinks.isEmpty ? List.filled(p.linkCount, 0) : List.of(p.solLinks),
           p.solBorders.isEmpty ? List.filled(p.borderCount, 0) : List.of(p.solBorders),
         );
-        final toggles = id == 'isiklari-sondur' || id == 'cevir';
+        final toggles = id == 'isiklari-sondur' || id == 'cevir' || k.actionMode;
         expect(toggles ? k.ok(p, sol, true) : k.solved(p, sol), isTrue, reason: '$id $lv çözüm kabul edilmedi');
         final start = k.initial(p);
-        if (!kNonUniqueKinds.contains(id) || id == 'boru-dondurme') {
+        if (k.actionMode) {
+          // başlangıç durumu kurulabilmeli ve oyun başta bitmiş olmamalı
+          expect(k.failed(p, start), isFalse, reason: '$id $lv başta kaybedilmiş');
+          PState.restore(start.serialize(), p);
+        }
+        if (!k.actionMode && (!kNonUniqueKinds.contains(id) || id == 'boru-dondurme')) {
           expect(k.solved(p, start), isFalse, reason: '$id $lv başlangıç çözülmüş');
         }
         final sw2 = Stopwatch()..start();

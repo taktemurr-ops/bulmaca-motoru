@@ -926,6 +926,7 @@ class _SudokuSolver {
 
   int? count(List<int> start, int limit, int budget) {
     final v = List.of(start);
+    lastFoundSolutions.clear();
     for (var i = 0; i < v.length; i++) {
       if (v[i] > 0 && !_okAt(v, i)) return 0;
     }
@@ -948,7 +949,10 @@ class _SudokuSolver {
         }
       }
       if (best < 0) {
-        if (consistent(v, true)) found++;
+        if (consistent(v, true)) {
+          found++;
+          if (lastFoundSolutions.length < 2) lastFoundSolutions.add(PState(List.of(v), const [], const []));
+        }
         return;
       }
       if (bestCount == 0) return;

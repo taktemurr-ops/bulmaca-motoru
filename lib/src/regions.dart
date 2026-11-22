@@ -826,12 +826,14 @@ class MapColorKind extends PuzzleKind {
       if (lv.givens.isNotEmpty && lv.givens[i] > 0) color[lv.regions[i]] = lv.givens[i];
     }
     final order = [for (final g in regs) if (!color.containsKey(g)) g]..sort((a, b) => adj[b]!.length.compareTo(adj[a]!.length));
+    lastFoundSolutions.clear();
     var found = 0, nodes = 0;
     var over = false;
     void go(int k) {
       if (found >= limit || over) return;
       if (k == order.length) {
         found++;
+        if (lastFoundSolutions.length < 2) lastFoundSolutions.add(PState([for (final rg in lv.regions) color[rg] ?? 0], const [], const []));
         return;
       }
       final g = order[k];

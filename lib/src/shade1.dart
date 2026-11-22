@@ -352,6 +352,7 @@ class NonogramKind extends PuzzleKind {
   @override
   int? countSolutions(PLevel lv, {int limit = 2, int budget = 200000}) {
     final v = [for (var i = 0; i < lv.n; i++) lv.givens.isNotEmpty && lv.givens[i] >= 0 ? lv.givens[i] : -1];
+    lastFoundSolutions.clear();
     var found = 0, nodes = 0;
     var over = false;
     // Satır mantığıyla sabit noktaya kadar ilerle.
@@ -395,6 +396,7 @@ class NonogramKind extends PuzzleKind {
       final i = v.indexOf(-1);
       if (i < 0) {
         found++;
+        if (lastFoundSolutions.length < 2) lastFoundSolutions.add(PState(List.of(v), const [], const []));
         return;
       }
       final maxCol = colored ? lv.param : 1;
@@ -838,7 +840,7 @@ class RoomsKind extends ShadeKind {
       }
       // şerit kuralını bozan uzun beyaz şeritleri ortadan karala
       var fixedAll = true;
-      for (var pass = 0; pass < 60; pass++) {
+      for (var pass = 0; pass < 200; pass++) {
         final strip = _badStrip(probe, v);
         if (strip == null) break;
         var did = false;
@@ -893,7 +895,8 @@ List<int>? _badStrip(PLevel lv, List<int> v) {
           if (regs.isEmpty || regs.last != lv.regions[c]) regs.add(lv.regions[c]);
         }
         if (regs.length > 2) {
-          return [for (final c in run) if (lv.regions[c] != regs.first && lv.regions[c] != regs.last) c];
+          final mid = [for (final c in run) if (lv.regions[c] != regs.first && lv.regions[c] != regs.last) c];
+          return [...mid, ...run.where((c) => !mid.contains(c))];
         }
         run = [];
       }
@@ -908,7 +911,7 @@ List<int> _rectRooms(int w, int h, SeededRandom r) {
   var next = 0;
   void cut(int x0, int y0, int x1, int y1) {
     final rw = x1 - x0, rh = y1 - y0;
-    final big = rw * rh > 6 || rw > 3 || rh > 3;
+    final big = rw * rh > 12 || rw > 4 || rh > 4;
     if (!big || (rw * rh <= 9 && r.chance(0.35))) {
       for (var y = y0; y < y1; y++) {
         for (var x = x0; x < x1; x++) {

@@ -6,6 +6,8 @@ export 'src/core.dart';
 export 'src/digits.dart';
 export 'src/grid_view.dart';
 export 'src/lines.dart';
+export 'src/move1.dart';
+export 'src/move2.dart';
 export 'src/numpath.dart';
 export 'src/regions.dart';
 export 'src/shade1.dart';

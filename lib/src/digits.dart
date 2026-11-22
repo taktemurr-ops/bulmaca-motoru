@@ -106,6 +106,7 @@ abstract class DigitKind extends PuzzleKind {
   @override
   int? countSolutions(PLevel lv, {int limit = 2, int budget = 200000}) {
     final v = [for (var i = 0; i < lv.n; i++) active(lv, i) && lv.givens.isNotEmpty && lv.givens[i] > 0 ? lv.givens[i] : 0];
+    lastFoundSolutions.clear();
     if (!consistent(lv, v, false)) return 0;
     final ps = peers(lv);
     var found = 0, nodes = 0;
@@ -125,7 +126,10 @@ abstract class DigitKind extends PuzzleKind {
         }
       }
       if (best < 0) {
-        if (consistent(lv, v, true)) found++;
+        if (consistent(lv, v, true)) {
+          found++;
+          if (lastFoundSolutions.length < 2) lastFoundSolutions.add(PState(List.of(v), const [], const []));
+        }
         return;
       }
       if (bestCount == 0) return;
@@ -759,12 +763,70 @@ class GroupKind extends DigitKind {
   @override
   PLevel make(int difficulty, SeededRandom r) {
     final (w, h) = sizeFor(difficulty);
-    for (var attempt = 0; attempt < 400; attempt++) {
-      final reg = _partition(w, h, 5, r);
-      final lv0 = PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, givens: List.filled(w * h, -1), param: 5);
-      final sol = randomFill(lv0, r, 3000);
-      if (sol == null) continue;
-      return PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, solCells: sol, givens: List.filled(w * h, -1), param: 5);
+    final probe = PLevel(kind: id, w: w, h: h, clues: const [], givens: const []);
+    for (var attempt = 0; attempt < 300; attempt++) {
+      final v = List.filled(w * h, 0);
+      final reg = List.filled(w * h, -1);
+      var g = 0;
+      var failed = false;
+      for (final start in shuffled(w * h, r)) {
+        if (reg[start] >= 0) continue;
+        final target = r.chance(0.75) ? 4 + r.nextInt(2) : 1 + r.nextInt(3);
+        final cells = [start];
+        reg[start] = g;
+        while (cells.length < target) {
+          final cand = <int>[];
+          for (final c in cells) {
+            for (final nb in probe.neighbors(c)) {
+              if (reg[nb] < 0 && !cand.contains(nb)) cand.add(nb);
+            }
+          }
+          if (cand.isEmpty) break;
+          final c = cand[r.nextInt(cand.length)];
+          reg[c] = g;
+          cells.add(c);
+        }
+        // 1..k değerlerini komşu çakışması olmadan dağıt; olmazsa küçült
+        var placed = false;
+        while (!placed && cells.isNotEmpty) {
+          for (var t = 0; t < 40 && !placed; t++) {
+            final perm = shuffled(cells.length, r);
+            var good = true;
+            for (var q = 0; q < cells.length && good; q++) {
+              v[cells[q]] = perm[q] + 1;
+            }
+            for (var q = 0; q < cells.length && good; q++) {
+              for (final nb in probe.neighbors(cells[q], diag: true)) {
+                if (nb != cells[q] && v[nb] == v[cells[q]] && (reg[nb] != g || nb != cells[q])) {
+                  if (reg[nb] >= 0 && v[nb] > 0) {
+                    good = false;
+                    break;
+                  }
+                }
+              }
+            }
+            if (good) {
+              placed = true;
+            } else {
+              for (final c in cells) {
+                v[c] = 0;
+              }
+            }
+          }
+          if (!placed) {
+            final drop = cells.removeLast();
+            reg[drop] = -1;
+            v[drop] = 0;
+          }
+        }
+        if (!placed) {
+          failed = true;
+          break;
+        }
+        g++;
+      }
+      if (failed || reg.contains(-1)) continue;
+      return PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, solCells: v, givens: List.filled(w * h, -1), param: 5);
     }
     throw StateError('suguru');
   }

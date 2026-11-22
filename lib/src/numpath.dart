@@ -94,6 +94,7 @@ class NumberPathKind extends DigitKind {
       }
     }
     final fixed = List.of(pos);
+    lastFoundSolutions.clear();
     final adj = [for (var i = 0; i < lv.n; i++) active(lv, i) ? nexts(lv, i) : const <int>[]];
     // Uzaklık budaması (yalnız kral/at): k'dan sonraki verilene adım sayısı
     var found = 0, nodes = 0;
@@ -116,6 +117,13 @@ class NumberPathKind extends DigitKind {
       if (found >= limit || over) return;
       if (k > nn) {
         found++;
+        if (lastFoundSolutions.length < 2) {
+          final cells = List.filled(lv.n, 0);
+          for (var q = 1; q <= nn; q++) {
+            if (pos[q] >= 0) cells[pos[q]] = q;
+          }
+          lastFoundSolutions.add(PState(cells, const [], const []));
+        }
         return;
       }
       final prev = pos[k - 1];

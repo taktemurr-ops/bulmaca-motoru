@@ -1,6 +1,8 @@
 import 'core.dart';
 import 'digits.dart';
 import 'lines.dart';
+import 'move1.dart';
+import 'move2.dart';
 import 'numpath.dart';
 import 'regions.dart';
 import 'shade1.dart';
@@ -59,11 +61,42 @@ final Map<String, PuzzleKind Function(int d)> kGridKinds = {
   'dominosa': (_) => const DominoPairKind(),
   'boru-dondurme': (_) => const PipeKind(),
   'harita-boyama': (_) => const MapColorKind(),
+  '2048': (_) => const MergeSlideKind(),
+  'sayi-birlestirme': (_) => const ChainMergeKind(),
+  'kayan-sayilar': (_) => const SlidingKind(),
+  'resim-kaydirma': (_) => const SlidingKind(picture: true),
+  'dondur': (_) => const TwiddleKind(),
+  'on-alti': (_) => const ShiftKind(),
+  'kaydirmali-ag': (_) => const NetSlideKind(),
+  'hanoi-kulesi': (_) => const HanoiKind(),
+  'tas-ziplatma': (_) => const PegJumpKind(),
+  'sayi-eslestirme': (_) => const NumberMatchKind(),
+  'mayin-tarlasi': (_) => const MinesKind(),
+  'kara-kutu': (_) => const BlackBoxKind(),
+  'kod-kirici': (_) => const CodeKind(),
+  'su-siralama': (_) => const SortKind(0),
+  'top-siralama': (_) => const SortKind(1),
+  'vida-sokme': (_) => const SortKind(2),
+  'altigen-siralama': (_) => const SortKind(3),
+  'ok-kacisi': (_) => const EscapeKind(),
+  'tikla-kaldir-taslar': (_) => const EscapeKind(blocks: true),
+  'otobus-yolcu-sikismasi': (_) => const BusKind(),
+  'araba-cikarma': (_) => const SlideBlockKind(),
+  'kayan-bloklar': (_) => const SlideBlockKind(klotski: true),
+  'sokoban': (_) => const BoxPushKind(),
+  'buz-kaydirma': (_) => const IceKind(),
+  'atalet': (_) => const IceKind(inertia: true),
+  'labirent': (_) => const MazeKind(),
 };
+
+/// Hamle oyunları (benzersizlik ve hücre çözümü yok).
+bool isMoveKind(String id) => kGridKinds[id]!(1).actionMode;
 
 /// Çözümü birden çok olabilen (kurala uyan her yanıt kabul) türler.
 const kNonUniqueKinds = {'isiklari-sondur', 'cevir', 'galaksiler', 'cit', 'boru-dondurme'};
 
+bool _nonUnique(String id) => kNonUniqueKinds.contains(id) || isMoveKind(id);
+
 /// Oyun kuralları.
 PuzzleRules gridRules(String gameId, String kind, {int levels = 100000}) =>
-    PuzzleRules(gameId: gameId, kindFor: kGridKinds[kind]!, levels: levels, unique: !kNonUniqueKinds.contains(kind));
+    PuzzleRules(gameId: gameId, kindFor: kGridKinds[kind]!, levels: levels, unique: !_nonUnique(kind));

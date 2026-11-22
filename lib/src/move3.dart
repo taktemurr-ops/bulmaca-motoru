@@ -497,7 +497,7 @@ class UntangleKind extends MoveKind {
   }
 
   List<(int, int)> _pos(PLevel lv, List<int> cells) {
-    final count = lv.extra[0].isEmpty ? 0 : lv.extra[0].reduce(math.max) + 1;
+    final count = cells.isEmpty ? 0 : cells.reduce(math.max);
     final pos = List.filled(count, (0, 0));
     for (var i = 0; i < lv.n; i++) {
       if (cells[i] > 0) pos[cells[i] - 1] = (i % lv.w, i ~/ lv.w);
@@ -740,13 +740,17 @@ class LinePhysicsKind extends MoveKind {
         walls[i] = 1;
       }
       // bilinen çözüm: topun altından sepetin üstüne eğimli rampa
+      final right = cx > bx;
+      final tx = right ? cx : cx + cupW - 1, ty = cy - 2;
+      final dx = (tx - bx).abs();
+      final sy = ty - dx;
+      if (sy < by + 2) continue;
       final path = <int>[];
-      var x = bx, y = by + 2;
-      final tx = cx + cupW ~/ 2, ty = cy - 2;
+      var x = bx, y = sy;
       path.add(y * w + x);
-      while (x != tx || y != ty) {
-        if (x != tx) x += (tx - x).sign;
-        if (y < ty && (r.chance(0.5) || x == tx)) y++;
+      while (x != tx) {
+        x += right ? 1 : -1;
+        y++;
         path.add(y * w + x);
       }
       if (path.any((i) => walls[i] == 1) || path.length < 3) continue;

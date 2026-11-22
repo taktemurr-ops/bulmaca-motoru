@@ -846,6 +846,7 @@ class GroupKind extends DigitKind {
       if (failed || reg.contains(-1)) continue;
       return PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, solCells: v, givens: List.filled(w * h, -1), param: 5);
     }
+    if (difficulty > 2) return make(difficulty - 2, r);
     throw StateError('suguru');
   }
 

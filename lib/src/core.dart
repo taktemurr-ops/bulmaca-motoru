@@ -282,7 +282,7 @@ abstract class PuzzleKind {
   /// Hücrenin oyuncu değerini kural değerine çevirir (işaret → 0,
   /// rakam türünde 0 → -1).
   int norm(int v) {
-    if (cellInput == CellInput.digits) return v <= 0 ? -1 : v;
+    if (cellInput == CellInput.digits || zeroUnknown) return v <= 0 ? -1 : v;
     if (v == markState) return 0;
     return v;
   }
@@ -297,7 +297,7 @@ abstract class PuzzleKind {
   /// Kazanıldı mı?
   bool solved(PLevel lv, PState player) {
     final s = normalized(lv, player);
-    if (cellInput == CellInput.digits && s.cells.contains(-1)) return false;
+    if ((cellInput == CellInput.digits || zeroUnknown) && s.cells.contains(-1)) return false;
     return ok(lv, s, true);
   }
 
@@ -307,7 +307,13 @@ abstract class PuzzleKind {
   /// Hücre değişkeni olmayan türler false döner.
   bool get solveCells => cellInput != CellInput.none;
 
-  List<int> cellDomain(PLevel lv, int i) => cellInput == CellInput.digits
+  /// Döngülü türde 0 "boş" değil "bilinmiyor" mu (ör. ikili bulmaca).
+  bool get zeroUnknown => false;
+
+  /// Rakam düğmeleri (null: 1..en büyük).
+  List<int>? padValues(PLevel lv, PState s) => null;
+
+  List<int> cellDomain(PLevel lv, int i) => cellInput == CellInput.digits || zeroUnknown
       ? [for (var v = 1; v < cellStates(lv); v++) v]
       : [for (var v = 0; v < cellStates(lv); v++) if (v != markState) v];
 
@@ -332,6 +338,9 @@ abstract class PuzzleKind {
   /// Benzersizlikten sonra kolaylık için eklenecek verilen oranı
   /// (verilebilir hücrelerin kalan kısmına göre).
   double extraGivenRatio(int difficulty) => 0;
+
+  /// Benzersizlikten sonra kaç verilenin kaldırılması denenecek.
+  int reduceTries(int difficulty) => 0;
 
   /// Durum satırı (ör. kalan yıldız).
   String status(PLevel lv, PState s, String lang) => '';
@@ -364,6 +373,15 @@ abstract class PuzzleKind {
   /// Hücreye dokunmak bağları değil hücreyi değiştirir mi.
   bool tapCell(PLevel lv, int i) => cellInput != CellInput.none && (lv.givens.isEmpty || lv.givens[i] < 0) && (lv.clues.isEmpty || lv.clues[i] < 0 || cluesEditable);
 
+  /// Oyunun başlangıç durumu.
+  PState initial(PLevel lv) => PState.empty(lv);
+
+  /// İpucu düğmesi çözümden değer gösterebilir mi.
+  bool get hintable => true;
+
+  /// Çözücü değişken sırası (null: hücreler, bağlar, kenarlar sırayla).
+  List<(int, int)>? solveOrder(PLevel lv) => null;
+
   /// Rakam düğmesindeki etiket.
   String digitLabel(int v) => '$v';
 
@@ -375,6 +393,11 @@ abstract class PuzzleKind {
 
   /// İpucu hücreleri de düzenlenebilir mi (ör. ışıkları söndür).
   bool get cluesEditable => false;
+
+  /// Renk türlerinde hücreye renk ver (harita: bütün bölge).
+  void setColor(PLevel lv, PState s, int i, int value) {
+    s.cells[i] = value;
+  }
 
   /// Dokunma bir hücreyi döngüleyince ek etki (ör. komşuları çevirmek).
   void onTap(PLevel lv, PState s, int i) {
@@ -390,18 +413,24 @@ int? genericCount(PuzzleKind k, PLevel lv, {int limit = 2, int budget = 200000})
     [for (var i = 0; i < lv.linkCount; i++) k.usesLinks ? (lv.givenLinks.isNotEmpty && lv.givenLinks[i] >= 0 ? lv.givenLinks[i] : -1) : 0],
     [for (var i = 0; i < lv.borderCount; i++) k.usesBorders ? (lv.givenBorders.isNotEmpty && lv.givenBorders[i] >= 0 ? lv.givenBorders[i] : -1) : 0],
   );
+  final custom = k.solveOrder(lv);
   final vars = <(int, int)>[];
-  if (k.solveCells) {
+  if (custom != null) {
+    for (final v in custom) {
+      final list = v.$1 == 0 ? s.cells : (v.$1 == 1 ? s.links : s.borders);
+      if (list[v.$2] < 0) vars.add(v);
+    }
+  } else if (k.solveCells) {
     for (var i = 0; i < lv.n; i++) {
       if (s.cells[i] < 0) vars.add((0, i));
     }
   }
-  if (k.usesLinks) {
+  if (custom == null && k.usesLinks) {
     for (var i = 0; i < lv.linkCount; i++) {
       if (s.links[i] < 0) vars.add((1, i));
     }
   }
-  if (k.usesBorders) {
+  if (custom == null && k.usesBorders) {
     for (var i = 0; i < lv.borderCount; i++) {
       if (s.borders[i] < 0) vars.add((2, i));
     }
@@ -441,11 +470,12 @@ PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r,
   final layer = k.givenLayer;
   final sol = layer == 0 ? lv.solCells : (layer == 1 ? lv.solLinks : lv.solBorders);
   final total = sol.length;
-  final g = List.filled(total, -1);
+  final pre = layer == 0 ? lv.givens : (layer == 1 ? lv.givenLinks : lv.givenBorders);
+  final g = [for (var i = 0; i < total; i++) pre.length == total ? pre[i] : -1];
   PLevel build() => layer == 0
       ? lv.withGivens(g)
       : (layer == 1 ? lv.withGivens(List.filled(lv.n, -1), g) : lv.withGivens(List.filled(lv.n, -1), null, g));
-  final order = [for (var i = 0; i < total; i++) i]..removeWhere((i) => layer == 0 && !k.canGive(lv, i));
+  final order = [for (var i = 0; i < total; i++) i]..removeWhere((i) => g[i] >= 0 || (layer == 0 && !k.canGive(lv, i)));
   r.shuffle(order);
   var cur = build();
   final maxGive = (order.length * k.maxGivenRatio(difficulty)).round();
@@ -453,6 +483,24 @@ PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r,
   for (var round = 0; round < 60; round++) {
     final c = k.countSolutions(cur, budget: budget);
     if (c == 1) {
+      // Zor bölümlerde gereksiz verilenleri ayıkla.
+      final tries = k.reduceTries(difficulty);
+      if (tries > 0) {
+        final have = [for (var i = 0; i < total; i++) if (g[i] >= 0 && !(pre.length == total && pre[i] >= 0)) i];
+        r.shuffle(have);
+        var t = 0;
+        for (final i in have) {
+          if (t++ >= tries) break;
+          final keep = g[i];
+          g[i] = -1;
+          if (k.countSolutions(build(), budget: budget ~/ 3) != 1) {
+            g[i] = keep;
+          } else {
+            order.insert(0, i);
+          }
+        }
+        cur = build();
+      }
       final extra = (order.length * k.extraGivenRatio(difficulty)).round();
       for (var e = 0; e < extra && order.isNotEmpty; e++) {
         final i = order.removeLast();

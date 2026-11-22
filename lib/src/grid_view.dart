@@ -43,7 +43,7 @@ class _PuzzleViewState extends State<PuzzleView> {
     lv = (ctx.generated as GeneratedLevel<PLevel>).puzzle;
     kind = widget.kindFor(ctx.spec.difficulty);
     final snap = ctx.resume['snap'];
-    st = (snap is String ? PState.restore(snap, lv) : null) ?? PState.empty(lv);
+    st = (snap is String ? PState.restore(snap, lv) : null) ?? kind.initial(lv);
     _seconds = (ctx.resume['secs'] as num?)?.toInt() ?? 0;
     _hints = (ctx.resume['hints'] as num?)?.toInt() ?? 0;
     _moves = (ctx.resume['moves'] as num?)?.toInt() ?? 0;
@@ -140,6 +140,10 @@ class _PuzzleViewState extends State<PuzzleView> {
     }
     final i = _cellAt(p);
     if (i == null) return;
+    if (kind.nodeStyle) {
+      _bridgeTap(i);
+      return;
+    }
     if (kind.usesLinks && !kind.tapCell(lv, i)) {
       // Bağ ortasına dokunma: en yakın komşu bağı değiştir.
       final r = _cell(i);
@@ -161,7 +165,7 @@ class _PuzzleViewState extends State<PuzzleView> {
         ctx.sfx(Sfx.tap);
       case CellInput.colors:
         _push();
-        setState(() => st.cells[i] = st.cells[i] == _brush ? 0 : _brush);
+        setState(() => kind.setColor(lv, st, i, st.cells[i] == _brush ? 0 : _brush));
         ctx.sfx(Sfx.place);
         _changed();
       case CellInput.cycle:
@@ -184,10 +188,68 @@ class _PuzzleViewState extends State<PuzzleView> {
     _changed();
   }
 
+  int? _bridgeFrom;
+
+  /// Köprü türü: iki ada arasındaki bütün bağları birlikte döngüle.
+  bool _bridge(int a, int b) {
+    if (a == b) return false;
+    final ax = a % lv.w, ay = a ~/ lv.w, bx = b % lv.w, by = b ~/ lv.w;
+    if (ax != bx && ay != by) return false;
+    final step = ax == bx ? (by > ay ? lv.w : -lv.w) : (bx > ax ? 1 : -1);
+    final links = <int>[];
+    var c = a;
+    while (c != b) {
+      final nx = c + step;
+      links.add(lv.linkBetween(c, nx));
+      c = nx;
+      if (c != b && lv.clues[c] >= 0) return false;
+    }
+    if (links.any((l) => l < 0 || (lv.givenLinks.isNotEmpty && lv.givenLinks[l] >= 0))) return false;
+    _push();
+    final next = (st.links[links.first] + 1) % kind.linkStates;
+    setState(() {
+      for (final l in links) {
+        st.links[l] = next;
+      }
+    });
+    ctx.sfx(Sfx.tap);
+    _changed();
+    return true;
+  }
+
+  /// Dokunulan boşluktaki köprü: iki yandaki en yakın adalar.
+  bool _bridgeTap(int i) {
+    if (lv.clues[i] >= 0) return false;
+    final x = i % lv.w, y = i ~/ lv.w;
+    int? find(int dx, int dy) {
+      var nx = x + dx, ny = y + dy;
+      while (nx >= 0 && ny >= 0 && nx < lv.w && ny < lv.h) {
+        final c = ny * lv.w + nx;
+        if (lv.clues[c] >= 0) return c;
+        nx += dx;
+        ny += dy;
+      }
+      return null;
+    }
+
+    // var olan köprü yönünü tercih et
+    final hl = x > 0 ? st.links[lv.linkBetween(i - 1, i)] : 0;
+    final order = hl > 0 || x == 0 ? const [(1, 0), (0, 1)] : const [(0, 1), (1, 0)];
+    for (final (dx, dy) in order) {
+      final a = find(-dx, -dy), b = find(dx, dy);
+      if (a != null && b != null && _bridge(a, b)) return true;
+    }
+    return false;
+  }
+
   void _panStart(Offset p) {
     _dragged = false;
     final i = _cellAt(p);
     _dragFrom = i;
+    if (kind.nodeStyle) {
+      _bridgeFrom = i != null && lv.clues[i] >= 0 ? i : null;
+      return;
+    }
     _paintValue = null;
     if (i != null && kind.cellInput == CellInput.cycle && !kind.dragLinks && kind.tapCell(lv, i)) {
       _push();
@@ -196,7 +258,7 @@ class _PuzzleViewState extends State<PuzzleView> {
       _dragged = true;
     } else if (i != null && kind.cellInput == CellInput.colors && kind.tapCell(lv, i)) {
       _push();
-      setState(() => st.cells[i] = st.cells[i] == _brush ? 0 : _brush);
+      setState(() => kind.setColor(lv, st, i, st.cells[i] == _brush ? 0 : _brush));
       _paintValue = st.cells[i];
       _dragged = true;
     }
@@ -204,6 +266,10 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   void _panUpdate(Offset p) {
     final i = _cellAt(p);
+    if (kind.nodeStyle) {
+      _dragFrom = i;
+      return;
+    }
     if (i == null || _dragFrom == null || i == _dragFrom) return;
     if (kind.dragLinks) {
       final l = lv.linkBetween(_dragFrom!, i);
@@ -223,12 +289,23 @@ class _PuzzleViewState extends State<PuzzleView> {
       return;
     }
     if (_paintValue != null && kind.tapCell(lv, i)) {
-      setState(() => st.cells[i] = _paintValue!);
+      if (kind.cellInput == CellInput.colors) {
+        setState(() => kind.setColor(lv, st, i, _paintValue!));
+      } else {
+        setState(() => st.cells[i] = _paintValue!);
+      }
     }
     _dragFrom = i;
   }
 
   void _panEnd() {
+    if (kind.nodeStyle) {
+      final a = _bridgeFrom, b = _dragFrom;
+      if (a != null && b != null && lv.clues[b] >= 0) _bridge(a, b);
+      _bridgeFrom = null;
+      _dragFrom = null;
+      return;
+    }
     if (_dragged) _changed();
     _dragFrom = null;
     _paintValue = null;
@@ -255,12 +332,12 @@ class _PuzzleViewState extends State<PuzzleView> {
   void _clear() {
     if (_ended) return;
     _push();
-    setState(() => st = PState.empty(lv));
+    setState(() => st = kind.initial(lv));
     _persist();
   }
 
   Future<void> _hint() async {
-    if (_ended) return;
+    if (_ended || !kind.hintable) return;
     // Çözümden farklı ilk değer.
     int? layer, idx;
     if (kind.cellInput != CellInput.none && lv.solCells.isNotEmpty) {
@@ -374,6 +451,7 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   Widget _numberPad(ColorScheme scheme) {
     final max = kind.cellStates(lv) - 1;
+    final values = kind.padValues(lv, st) ?? [for (var v = 1; v <= max; v++) v];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Wrap(
@@ -381,9 +459,9 @@ class _PuzzleViewState extends State<PuzzleView> {
         spacing: 4,
         runSpacing: 4,
         children: [
-          for (var v = 1; v <= max; v++)
+          for (final v in values)
             SizedBox(
-              width: max > 9 ? 40 : 44,
+              width: values.length > 12 ? 38 : (max > 9 ? 40 : 44),
               height: 46,
               child: FilledButton.tonal(
                 style: FilledButton.styleFrom(padding: EdgeInsets.zero),

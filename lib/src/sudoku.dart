@@ -55,23 +55,26 @@ class SudokuKind extends PuzzleKind {
   int cellStates(PLevel lv) => lv.param + 1;
 
   @override
-  double extraGivenRatio(int d) => d <= 2 ? 0.35 : (d <= 4 ? 0.2 : (d <= 6 ? 0.08 : 0));
+  double extraGivenRatio(int difficulty) => difficulty <= 2 ? 0.35 : (difficulty <= 4 ? 0.2 : (difficulty <= 6 ? 0.08 : 0));
 
   @override
-  double maxGivenRatio(int d) => 0.8;
+  double maxGivenRatio(int difficulty) => 0.8;
+
+  @override
+  int reduceTries(int difficulty) => difficulty <= 2 ? 0 : (difficulty <= 5 ? 20 : 45);
 
   static (int, int) boxDims(int n) => switch (n) { 4 => (2, 2), 6 => (3, 2), 8 => (4, 2), _ => (3, 3) };
 
   // ------------------------------------------------------------------ üretim
   @override
-  PLevel make(int d, SeededRandom r) {
-    final sp = specFor(d);
+  PLevel make(int difficulty, SeededRandom r) {
+    final sp = specFor(difficulty);
     for (var attempt = 0; attempt < 30; attempt++) {
-      final lv = _tryMake(sp, d, r);
+      final lv = _tryMake(sp, difficulty, r);
       if (lv != null) return lv;
     }
     // Güvenli geri dönüş: klasik
-    return _tryMake(SudokuSpec(sp.n, const {}), d, r)!;
+    return _tryMake(SudokuSpec(sp.n, const {}), difficulty, r)!;
   }
 
   PLevel? _tryMake(SudokuSpec sp, int d, SeededRandom r) {

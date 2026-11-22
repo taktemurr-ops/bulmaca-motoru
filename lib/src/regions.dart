@@ -417,6 +417,8 @@ class RectKind extends BorderRegionKind {
   double maxGivenRatio(int difficulty) => 0;
 }
 
+int _pairKey(int a, int b, int k) => a < b ? a * (k + 1) + b : b * (k + 1) + a;
+
 // ======================================================================
 // Dominosa
 
@@ -480,7 +482,7 @@ class DominoPairKind extends PuzzleKind {
       final (a, b) = lv.linkCells(l);
       used[a] = true;
       used[b] = true;
-      pairs.add(math.min(lv.clues[a], lv.clues[b]) * (k + 1) + math.max(lv.clues[a], lv.clues[b]));
+      pairs.add(_pairKey(lv.clues[a], lv.clues[b], k));
     }
     void go() {
       if (found >= limit || over) return;
@@ -491,7 +493,7 @@ class DominoPairKind extends PuzzleKind {
         final opts = <int>[];
         for (final nb in lv.neighbors(i)) {
           if (used[nb]) continue;
-          final key = math.min(lv.clues[i], lv.clues[nb]) * (k + 1) + math.max(lv.clues[i], lv.clues[nb]);
+          final key = _pairKey(lv.clues[i], lv.clues[nb], k);
           if (!pairs.contains(key)) opts.add(nb);
         }
         if (best < 0 || opts.length < bestOpts.length) {
@@ -509,7 +511,7 @@ class DominoPairKind extends PuzzleKind {
           over = true;
           return;
         }
-        final key = math.min(lv.clues[best], lv.clues[nb]) * (k + 1) + math.max(lv.clues[best], lv.clues[nb]);
+        final key = _pairKey(lv.clues[best], lv.clues[nb], k);
         used[best] = true;
         used[nb] = true;
         pairs.add(key);

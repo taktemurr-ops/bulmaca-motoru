@@ -583,7 +583,7 @@ class UntangleKind extends MoveKind {
           }
         }
       }
-      if (edges.length < nodes) continue;
+      if (edges.length < (ropes ? nodes ~/ 2 : nodes)) continue;
       // karıştır: düğümleri rastgele hücrelere dağıt
       final start = List.filled(n * n, 0);
       final spots = shuffled(n * n, r).take(nodes).toList();
@@ -667,7 +667,8 @@ class LinePhysicsKind extends MoveKind {
       segs.addAll([(Offset(x, y), Offset(x + 1, y)), (Offset(x + 1, y), Offset(x + 1, y + 1)), (Offset(x, y + 1), Offset(x + 1, y + 1)), (Offset(x, y), Offset(x, y + 1))]);
     }
     final cup = lv.extra[0][1];
-    final cupRect = Rect.fromLTWH((cup % lv.w).toDouble(), (cup ~/ lv.w).toDouble(), 1, 1);
+    final cw = lv.extra[0].length > 2 ? lv.extra[0][2] : 1;
+    final cupRect = Rect.fromLTWH((cup % lv.w).toDouble(), (cup ~/ lv.w).toDouble(), cw.toDouble(), 1);
     // sepet kenarları
     segs.add((cupRect.topLeft, cupRect.bottomLeft));
     segs.add((cupRect.topRight, cupRect.bottomRight));
@@ -707,7 +708,7 @@ class LinePhysicsKind extends MoveKind {
 
   @override
   bool pathMove(PLevel lv, PState s, List<int> path) {
-    if (path.any((i) => s.cells[i] == 1 || i == lv.extra[0][0] || i == lv.extra[0][1])) return false;
+    if (path.any((i) => s.cells[i] == 1 || i == lv.extra[0][0])) return false;
     final (_, okk) = simulate(lv, s.cells, path);
     s.aux
       ..clear()
@@ -724,23 +725,24 @@ class LinePhysicsKind extends MoveKind {
   @override
   PLevel make(int difficulty, SeededRandom r) {
     final w = 8 + difficulty ~/ 3, h = 10 + difficulty ~/ 3;
-    for (var attempt = 0; attempt < 300; attempt++) {
+    for (var attempt = 0; attempt < 600; attempt++) {
       final bx = 1 + r.nextInt(w - 2), by = 1;
-      final cx = r.nextInt(w), cy = h - 1 - r.nextInt(2);
-      if ((cx - bx).abs() < 2) continue;
+      final cupW = difficulty <= 5 ? 3 : 2;
+      final cx = r.nextInt(w - cupW + 1), cy = h - 1 - r.nextInt(2);
+      if (bx >= cx - 1 && bx <= cx + cupW) continue;
       final walls = List.filled(w * h, 0);
-      final probe = PLevel(kind: id, w: w, h: h, clues: const [], extra: [[by * w + bx, cy * w + cx]], givens: const []);
+      final probe = PLevel(kind: id, w: w, h: h, clues: const [], extra: [[by * w + bx, cy * w + cx, cupW]], givens: const []);
       // engeller: topun hemen altında değil
       for (var k = 0; k < difficulty; k++) {
         final i = r.nextInt(w * h);
         final x = i % w, y = i ~/ w;
-        if (y <= 2 || (x == bx) || (x == cx && y >= cy - 1)) continue;
+        if (y <= 2 || (x == bx) || (x >= cx - 1 && x <= cx + cupW && y >= cy - 2)) continue;
         walls[i] = 1;
       }
       // bilinen çözüm: topun altından sepetin üstüne eğimli rampa
       final path = <int>[];
       var x = bx, y = by + 2;
-      final tx = cx, ty = cy - 1;
+      final tx = cx + cupW ~/ 2, ty = cy - 2;
       path.add(y * w + x);
       while (x != tx || y != ty) {
         if (x != tx) x += (tx - x).sign;
@@ -752,7 +754,7 @@ class LinePhysicsKind extends MoveKind {
       // çözümsüz düz düşüş olmasın
       final (_, direct) = simulate(probe, walls, const []);
       if (!okk || direct) continue;
-      return PLevel(kind: id, w: w, h: h, clues: const [], extra: [[by * w + bx, cy * w + cx], walls, path], solCells: const [], givens: const []);
+      return PLevel(kind: id, w: w, h: h, clues: const [], extra: [[by * w + bx, cy * w + cx, cupW], walls, path], solCells: const [], givens: const []);
     }
     throw StateError('physics');
   }
@@ -765,7 +767,7 @@ class LinePhysicsKind extends MoveKind {
     for (var i = 0; i < lv.n; i++) {
       if (s.cells[i] == 1) c.drawRRect(RRect.fromRectAndRadius(cell(i).deflate(cs * 0.04), Radius.circular(cs * 0.1)), Paint()..color = const Color(0xFF7D8B91));
     }
-    final cup = cell(lv.extra[0][1]);
+    final cup = cell(lv.extra[0][1]).expandToInclude(cell(lv.extra[0][1] + (lv.extra[0].length > 2 ? lv.extra[0][2] : 1) - 1));
     final p = Paint()
       ..color = const Color(0xFF8A5A34)
       ..strokeWidth = cs * 0.1

@@ -424,7 +424,7 @@ class PearlKind extends PuzzleKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [5, 6, 6, 7, 7, 8, 8, 9, 10, 10][difficulty - 1];
+    final n = const [5, 6, 6, 7, 7, 7, 8, 8, 8, 8][difficulty - 1];
     for (var attempt = 0; attempt < 100; attempt++) {
       final reg = randomSimpleRegion(n - 1, n - 1, 0.45, r);
       final probe = PLevel(kind: id, w: n, h: n, clues: List.filled(n * n, -1), givens: const []);
@@ -577,7 +577,7 @@ class ArrowLoopKind extends PuzzleKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [5, 6, 6, 7, 7, 8, 8, 8, 9, 9][difficulty - 1];
+    final n = const [5, 6, 6, 7, 7, 7, 8, 8, 8, 8][difficulty - 1];
     for (var attempt = 0; attempt < 200; attempt++) {
       final reg = randomSimpleRegion(n - 1, n - 1, 0.55, r);
       final probe = PLevel(kind: id, w: n, h: n, clues: List.filled(n * n, -1), givens: const []);

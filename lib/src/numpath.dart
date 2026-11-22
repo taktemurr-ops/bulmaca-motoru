@@ -353,7 +353,7 @@ class FillKind extends DigitKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final s = const [5, 5, 6, 6, 7, 7, 8, 8, 9, 9][difficulty - 1];
+    final s = const [5, 5, 6, 6, 7, 7, 7, 8, 8, 8][difficulty - 1];
     final maxSize = difficulty <= 3 ? 4 : (difficulty <= 6 ? 5 : 6);
     for (var attempt = 0; attempt < 400; attempt++) {
       final reg = List.filled(s * s, -1);

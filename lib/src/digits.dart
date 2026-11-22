@@ -767,11 +767,36 @@ class GroupKind extends DigitKind {
     for (var attempt = 0; attempt < 300; attempt++) {
       final v = List.filled(w * h, 0);
       final reg = List.filled(w * h, -1);
+      final members = <int, List<int>>{};
+      bool assign(List<int> cells) {
+        for (var t = 0; t < 60; t++) {
+          final perm = shuffled(cells.length, r);
+          var good = true;
+          for (var q = 0; q < cells.length && good; q++) {
+            final val = perm[q] + 1;
+            for (final nb in probe.neighbors(cells[q], diag: true)) {
+              if (cells.contains(nb)) continue;
+              if (v[nb] == val) {
+                good = false;
+                break;
+              }
+            }
+          }
+          if (good) {
+            for (var q = 0; q < cells.length; q++) {
+              v[cells[q]] = perm[q] + 1;
+            }
+            return true;
+          }
+        }
+        return false;
+      }
+
       var g = 0;
       var failed = false;
-      for (var start = 0; start < w * h; start++) {
+      for (var start = 0; start < w * h && !failed; start++) {
         if (reg[start] >= 0) continue;
-        final target = r.chance(0.75) ? 4 + r.nextInt(2) : 1 + r.nextInt(3);
+        final target = r.chance(0.75) ? 4 + r.nextInt(2) : 2 + r.nextInt(2);
         final cells = [start];
         reg[start] = g;
         while (cells.length < target) {
@@ -786,43 +811,36 @@ class GroupKind extends DigitKind {
           reg[c] = g;
           cells.add(c);
         }
-        // 1..k değerlerini komşu çakışması olmadan dağıt; olmazsa küçült
-        var placed = false;
-        while (!placed && cells.isNotEmpty) {
-          for (var t = 0; t < 40 && !placed; t++) {
-            final perm = shuffled(cells.length, r);
-            var good = true;
-            for (var q = 0; q < cells.length && good; q++) {
-              v[cells[q]] = perm[q] + 1;
+        while (cells.isNotEmpty && !assign(cells)) {
+          final drop = cells.removeLast();
+          reg[drop] = -1;
+        }
+        if (cells.isEmpty) {
+          // tek hücre yerleşemedi: komşu küçük bölgeye katıp yeniden dağıt
+          var merged = false;
+          for (final nb in probe.neighbors(start)) {
+            final gg = reg[nb];
+            if (gg < 0 || members[gg]!.length >= 5) continue;
+            final old = members[gg]!;
+            final saved = [for (final c in old) v[c]];
+            for (final c in old) {
+              v[c] = 0;
             }
-            for (var q = 0; q < cells.length && good; q++) {
-              for (final nb in probe.neighbors(cells[q], diag: true)) {
-                if (nb != cells[q] && v[nb] == v[cells[q]] && (reg[nb] != g || nb != cells[q])) {
-                  if (reg[nb] >= 0 && v[nb] > 0) {
-                    good = false;
-                    break;
-                  }
-                }
-              }
+            final grown = [...old, start];
+            if (assign(grown)) {
+              reg[start] = gg;
+              members[gg] = grown;
+              merged = true;
+              break;
             }
-            if (good) {
-              placed = true;
-            } else {
-              for (final c in cells) {
-                v[c] = 0;
-              }
+            for (var q = 0; q < old.length; q++) {
+              v[old[q]] = saved[q];
             }
           }
-          if (!placed) {
-            final drop = cells.removeLast();
-            reg[drop] = -1;
-            v[drop] = 0;
-          }
+          if (!merged) failed = true;
+          continue;
         }
-        if (!placed) {
-          failed = true;
-          break;
-        }
+        members[g] = cells;
         g++;
       }
       if (failed || reg.contains(-1)) continue;

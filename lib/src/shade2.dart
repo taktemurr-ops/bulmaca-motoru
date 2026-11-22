@@ -637,7 +637,7 @@ class TetroKind extends ShadeKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [5, 6, 6, 7, 7, 8, 8, 9, 10, 10][difficulty - 1];
+    final n = const [5, 5, 6, 6, 6, 7, 7, 7, 8, 8][difficulty - 1];
     for (var attempt = 0; attempt < 300; attempt++) {
       final reg = partitionGrid(n, n, 7, r);
       // her bölge en az 4 hücre olmalı: küçükleri komşuya kat

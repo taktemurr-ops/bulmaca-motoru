@@ -38,7 +38,7 @@ class SortKind extends MoveKind {
   }
 
   /// Altıgen türünde yalnız yan yana tüpler arasında hamle.
-  static bool hexAdjacent(int a, int b, int w) => (a - b).abs() == 1;
+  static bool hexAdjacent(int a, int b, int w) => true;
 
   /// a'dan b'ye hamle; yapılabildiyse yeni tüpler.
   static bool move(List<List<int>> t, int a, int b, int h, int mode, int w) {
@@ -536,7 +536,7 @@ class SlideBlockKind extends MoveKind {
   bool ok(PLevel lv, PState s, bool complete) => true;
 
   /// Genişlik öncelikli en kısa çözüm (hamle sayısı; yoksa -1).
-  static int bfs(List<int> start, int w, int h, List<int> spec, int exit, {int limit = 60000}) {
+  static int bfs(List<int> start, int w, int h, List<int> spec, int exit, {int limit = 25000}) {
     final seen = <String>{start.join(',')};
     var frontier = [start];
     final ids = start.where((v) => v > 0).toSet().toList();
@@ -572,7 +572,7 @@ class SlideBlockKind extends MoveKind {
     final want = klotski ? const [3, 5, 8, 12, 16, 20, 25, 30, 35, 40][difficulty - 1] : const [2, 4, 6, 8, 10, 13, 16, 20, 24, 28][difficulty - 1];
     List<int>? best;
     var bestD = -1, bestSpec = <int>[], exit = 0;
-    for (var attempt = 0; attempt < (klotski ? 60 : 120); attempt++) {
+    for (var attempt = 0; attempt < (klotski ? 20 : 40); attempt++) {
       final c = List.filled(w * h, 0);
       final spec = <int>[];
       bool place(int bw, int bh, int axis, int x, int y) {

@@ -734,7 +734,7 @@ class GroupKind extends DigitKind {
   @override
   String get id => 'suguru';
 
-  static (int, int) sizeFor(int d) => switch (d) { 1 || 2 => (5, 5), 3 || 4 => (6, 6), 5 || 6 => (7, 7), 7 || 8 => (8, 8), _ => (9, 9) };
+  static (int, int) sizeFor(int d) => switch (d) { 1 || 2 => (5, 5), 3 || 4 => (6, 6), 5 || 6 || 7 => (7, 7), _ => (8, 8) };
 
   static final _size = Expando<List<int>>();
   List<int> regionSize(PLevel lv) => _size[lv] ??= () {
@@ -769,7 +769,7 @@ class GroupKind extends DigitKind {
       final reg = List.filled(w * h, -1);
       var g = 0;
       var failed = false;
-      for (final start in shuffled(w * h, r)) {
+      for (var start = 0; start < w * h; start++) {
         if (reg[start] >= 0) continue;
         final target = r.chance(0.75) ? 4 + r.nextInt(2) : 1 + r.nextInt(3);
         final cells = [start];

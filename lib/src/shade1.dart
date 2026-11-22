@@ -827,8 +827,8 @@ class RoomsKind extends ShadeKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [5, 5, 6, 6, 7, 7, 8, 8, 9, 10][difficulty - 1];
-    for (var attempt = 0; attempt < 200; attempt++) {
+    final n = const [5, 5, 6, 6, 7, 7, 7, 8, 8, 8][difficulty - 1];
+    for (var attempt = 0; attempt < 600; attempt++) {
       final reg = _rectRooms(n, n, r);
       final probe = PLevel(kind: id, w: n, h: n, clues: List.filled(n * n, -1), regions: reg, givens: const []);
       final v = List.filled(n * n, 0);
@@ -1177,7 +1177,7 @@ class MosaicKind extends ShadeKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [5, 6, 7, 8, 8, 9, 10, 10, 12, 12][difficulty - 1];
+    final n = const [5, 6, 7, 7, 8, 8, 9, 9, 10, 10][difficulty - 1];
     final v = [for (var i = 0; i < n * n; i++) r.chance(0.45) ? 1 : 0];
     final probe = PLevel(kind: id, w: n, h: n, clues: const [], givens: const []);
     final clues = List.filled(n * n, -1);
@@ -1368,7 +1368,7 @@ class BinaryKind extends PuzzleKind {
 
   @override
   PLevel make(int difficulty, SeededRandom r) {
-    final n = const [4, 6, 6, 8, 8, 8, 10, 10, 12, 12][difficulty - 1];
+    final n = const [4, 6, 6, 6, 8, 8, 8, 10, 10, 10][difficulty - 1];
     // rastgele geçerli doldurma: genel çözücü ile
     final probe = PLevel(kind: id, w: n, h: n, clues: const [], givens: List.filled(n * n, -1));
     final v = List.filled(n * n, -1);

@@ -3,6 +3,7 @@ import 'digits.dart';
 import 'lines.dart';
 import 'move1.dart';
 import 'move2.dart';
+import 'move3.dart';
 import 'numpath.dart';
 import 'regions.dart';
 import 'shade1.dart';
@@ -87,6 +88,14 @@ final Map<String, PuzzleKind Function(int d)> kGridKinds = {
   'buz-kaydirma': (_) => const IceKind(),
   'atalet': (_) => const IceKind(inertia: true),
   'labirent': (_) => const MazeKind(),
+  'tangram': (_) => const TangramKind(),
+  'yapboz': (_) => const JigsawKind(),
+  'cozme': (_) => const UntangleKind(),
+  'ip-cozme': (_) => const UntangleKind(ropes: true),
+  'fizik-cizgi-bulmacasi': (_) => const LinePhysicsKind(),
+  'sihirli-kup': (_) => const CubeKind(),
+  'hayaletler': (_) => const MirrorKind(),
+  'mantik-izgarasi': (_) => const ZebraKind(),
 };
 
 /// Hamle oyunları (benzersizlik ve hücre çözümü yok).

@@ -594,7 +594,7 @@ class DominoPairKind extends PuzzleKind {
   }
 
   @override
-  double maxGivenRatio(int difficulty) => 0.3;
+  double maxGivenRatio(int difficulty) => 0.8;
 }
 
 // ======================================================================

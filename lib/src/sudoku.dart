@@ -46,6 +46,9 @@ class SudokuKind extends PuzzleKind {
   const SudokuKind(this.kindId, this.specFor);
 
   @override
+  int get solveBudget => 150000;
+
+  @override
   String get id => kindId;
 
   @override

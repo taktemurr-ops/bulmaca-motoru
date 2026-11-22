@@ -65,55 +65,86 @@ class StarKind extends ShadeKind {
   PLevel make(int difficulty, SeededRandom r) {
     final (n, k) = sizeFor(difficulty, queens);
     for (var attempt = 0; attempt < 400; attempt++) {
-      // yıldızları satır satır yerleştir
+      // önce yıldızlar: satır satır, sütun ve komşuluk kurallarıyla
       final v = List.filled(n * n, 0);
       final colCount = List.filled(n, 0);
-      var okk = true;
-      for (var y = 0; y < n && okk; y++) {
-        var placed = 0;
-        for (var t = 0; t < 60 && placed < k; t++) {
-          final x = r.nextInt(n);
-          final i = y * n + x;
-          if (v[i] == 1 || colCount[x] >= k) continue;
-          final probe = PLevel(kind: id, w: n, h: n, clues: const [], givens: const []);
-          if (probe.neighbors(i, diag: true).any((nb) => v[nb] == 1)) continue;
-          v[i] = 1;
-          colCount[x]++;
-          placed++;
+      final probe = PLevel(kind: id, w: n, h: n, clues: const [], givens: const []);
+      var nodes = 0;
+      bool row(int y) {
+        if (y == n) return true;
+        final opts = shuffled(n, r);
+        bool pick(int from, int need, List<int> chosen) {
+          if (need == 0) {
+            for (final x in chosen) {
+              v[y * n + x] = 1;
+              colCount[x]++;
+            }
+            if (row(y + 1)) return true;
+            for (final x in chosen) {
+              v[y * n + x] = 0;
+              colCount[x]--;
+            }
+            return false;
+          }
+          for (var q = from; q < opts.length; q++) {
+            if (++nodes > 20000) return false;
+            final x = opts[q];
+            final i = y * n + x;
+            if (colCount[x] >= k) continue;
+            if (chosen.any((c) => (c - x).abs() <= 1)) continue;
+            if (probe.neighbors(i, diag: true).any((nb) => v[nb] == 1)) continue;
+            // kalan satırlar sütun kotasını doldurabilmeli
+            if (pick(q + 1, need - 1, [...chosen, x])) return true;
+          }
+          return false;
         }
-        if (placed < k) okk = false;
+
+        return pick(0, k, []);
       }
-      if (!okk) continue;
-      // bölgeleri yıldızlardan büyüt: her bölge k yıldız
+
+      if (!row(0)) continue;
+      // bölgeler: yıldız grupları (k=2: yakın iki yıldız) tohum; büyüt
       final stars = [for (var i = 0; i < n * n; i++) if (v[i] == 1) i];
-      r.shuffle(stars);
       final reg = List.filled(n * n, -1);
-      for (var g = 0; g < n; g++) {
-        for (var q = 0; q < k; q++) {
-          reg[stars[g * k + q]] = g;
+      if (k == 1) {
+        for (var g = 0; g < stars.length; g++) {
+          reg[stars[g]] = g;
         }
+      } else {
+        // yıldızları yakınlığa göre eşle
+        final left = List.of(stars);
+        r.shuffle(left);
+        var g = 0;
+        while (left.isNotEmpty) {
+          final a = left.removeLast();
+          left.sort((p, q) => ((p % n - a % n).abs() + (p ~/ n - a ~/ n).abs()).compareTo((q % n - a % n).abs() + (q ~/ n - a ~/ n).abs()));
+          final b = left.removeAt(0);
+          // a'dan b'ye düz yol: hücreleri bölgeye kat (yıldız olmayanlar)
+          var c = a;
+          reg[a] = g;
+          while (c != b) {
+            final cx = c % n, cy = c ~/ n, bx = b % n, by = b ~/ n;
+            c = cx != bx ? c + (bx > cx ? 1 : -1) : c + (by > cy ? n : -n);
+            if (c != b && (v[c] == 1 || reg[c] >= 0)) break;
+            reg[c] = g;
+          }
+          if (reg[b] != g) break;
+          g++;
+        }
+        if (stars.any((c) => reg[c] < 0)) continue;
       }
-      // k=2 ise aynı bölgenin iki yıldızı bağlanmalı: yol aç
-      var left = reg.where((x) => x < 0).length;
+      var remaining = reg.where((x) => x < 0).length;
       var guard = 0;
-      while (left > 0 && guard++ < 20000) {
+      while (remaining > 0 && guard++ < 60000) {
         final i = r.nextInt(n * n);
         if (reg[i] < 0) continue;
         final x = i % n, y = i ~/ n;
         final opts = [if (x > 0) i - 1, if (x < n - 1) i + 1, if (y > 0) i - n, if (y < n - 1) i + n].where((c) => reg[c] < 0 && v[c] == 0).toList();
         if (opts.isEmpty) continue;
         reg[opts[r.nextInt(opts.length)]] = reg[i];
-        left--;
+        remaining--;
       }
-      if (left > 0) continue;
-      // bölgeler bağlı mı
-      final probe = PLevel(kind: id, w: n, h: n, clues: const [], regions: reg, givens: const []);
-      var connected = true;
-      for (var g = 0; g < n && connected; g++) {
-        final comps = components(probe, (c) => reg[c] == g);
-        if (comps.length != 1) connected = false;
-      }
-      if (!connected) continue;
+      if (remaining > 0) continue;
       return PLevel(kind: id, w: n, h: n, clues: const [], regions: reg, solCells: v, givens: List.filled(n * n, -1), param: k);
     }
     throw StateError('star');
@@ -509,22 +540,16 @@ class PairShadeKind extends ShadeKind {
         v[j] = 1;
         dominos.add([i, j]);
       }
-      // her bölge iki kara: bölgeleri karalardan büyüt — her bölgeye
-      // bir dominonun iki ayrı yarısı ya da tek domino
+      // her domino kendi bölgesinin tohumu; bölgeleri büyüt
       final reg = List.filled(n * n, -1);
-      final shaded = [for (var i = 0; i < n * n; i++) if (v[i] == 1) i];
-      r.shuffle(shaded);
-      var g = 0;
-      // karaları ikişer ikişer bölgelere ata (komşu olmayanlar da olabilir)
-      for (var k = 0; k + 1 < shaded.length; k += 2) {
-        reg[shaded[k]] = g;
-        reg[shaded[k + 1]] = g;
-        g++;
+      for (var g = 0; g < dominos.length; g++) {
+        reg[dominos[g][0]] = g;
+        reg[dominos[g][1]] = g;
       }
-      if (shaded.length.isOdd) continue;
+      if (dominos.length < n) continue;
       var left = reg.where((x) => x < 0).length;
       var guard = 0;
-      while (left > 0 && guard++ < 40000) {
+      while (left > 0 && guard++ < 60000) {
         final i = r.nextInt(n * n);
         if (reg[i] < 0) continue;
         final x = i % n, y = i ~/ n;
@@ -534,12 +559,6 @@ class PairShadeKind extends ShadeKind {
         left--;
       }
       if (left > 0) continue;
-      final pr = PLevel(kind: id, w: n, h: n, clues: const [], regions: reg, givens: const []);
-      var connected = true;
-      for (var q = 0; q < g && connected; q++) {
-        if (components(pr, (c) => reg[c] == q).length != 1) connected = false;
-      }
-      if (!connected) continue;
       return PLevel(kind: id, w: n, h: n, clues: const [], regions: reg, solCells: v, givens: List.filled(n * n, -1));
     }
     throw StateError('norinori');

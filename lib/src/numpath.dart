@@ -42,6 +42,7 @@ class NumberPathKind extends DigitKind {
       case 1:
         return (dx.abs() == 1 && dy.abs() == 2) || (dx.abs() == 2 && dy.abs() == 1);
       default:
+        if (lv.extra[0][a] < 0) return false;
         final (ux, uy) = _dirs[lv.extra[0][a]];
         if (dx == 0 && dy == 0) return false;
         // b, a'dan ok yönünde herhangi bir uzaklıkta
@@ -346,22 +347,73 @@ class FillKind extends DigitKind {
   PLevel make(int difficulty, SeededRandom r) {
     final s = const [5, 5, 6, 6, 7, 7, 8, 8, 9, 10][difficulty - 1];
     final maxSize = difficulty <= 3 ? 4 : (difficulty <= 6 ? 5 : 6);
-    for (var attempt = 0; attempt < 100; attempt++) {
-      final reg = partitionGrid(s, s, maxSize, r);
+    for (var attempt = 0; attempt < 400; attempt++) {
+      final reg = List.filled(s * s, -1);
       final size = <int, int>{};
-      for (final g in reg) {
-        size[g] = (size[g] ?? 0) + 1;
-      }
-      final sol = [for (final g in reg) size[g]!];
-      // aynı büyüklükte komşu bölge olmamalı
+      var id = 0;
       var bad = false;
-      for (var i = 0; i < s * s && !bad; i++) {
-        for (final nb in [if (i % s < s - 1) i + 1, if (i ~/ s < s - 1) i + s]) {
-          if (reg[i] != reg[nb] && sol[i] == sol[nb]) bad = true;
+      for (final start in shuffled(s * s, r)) {
+        if (reg[start] >= 0) continue;
+        final cells = [start];
+        reg[start] = id;
+        final target = 1 + r.nextInt(maxSize);
+        while (cells.length < target) {
+          final cand = <int>[];
+          for (final c in cells) {
+            final x = c % s, y = c ~/ s;
+            for (final nb in [if (x > 0) c - 1, if (x < s - 1) c + 1, if (y > 0) c - s, if (y < s - 1) c + s]) {
+              if (reg[nb] < 0) cand.add(nb);
+            }
+          }
+          if (cand.isEmpty) break;
+          final c = cand[r.nextInt(cand.length)];
+          reg[c] = id;
+          cells.add(c);
         }
+        // komşu bölgelerle aynı büyüklükte olmasın: gerekirse bir hücre daha
+        bool clash() {
+          for (final c in cells) {
+            final x = c % s, y = c ~/ s;
+            for (final nb in [if (x > 0) c - 1, if (x < s - 1) c + 1, if (y > 0) c - s, if (y < s - 1) c + s]) {
+              if (reg[nb] >= 0 && reg[nb] != id && size[reg[nb]] == cells.length) return true;
+            }
+          }
+          return false;
+        }
+
+        var guard = 0;
+        while (clash() && guard++ < 4) {
+          final cand = <int>[];
+          for (final c in cells) {
+            final x = c % s, y = c ~/ s;
+            for (final nb in [if (x > 0) c - 1, if (x < s - 1) c + 1, if (y > 0) c - s, if (y < s - 1) c + s]) {
+              if (reg[nb] < 0) cand.add(nb);
+            }
+          }
+          if (cand.isEmpty || cells.length >= maxSize + 2) break;
+          final c = cand[r.nextInt(cand.length)];
+          reg[c] = id;
+          cells.add(c);
+        }
+        if (clash()) {
+          bad = true;
+          break;
+        }
+        size[id] = cells.length;
+        id++;
       }
       if (bad) continue;
-      return PLevel(kind: id, w: s, h: s, clues: const [], solCells: sol, givens: List.filled(s * s, -1), param: maxSize);
+      final sol = [for (final g in reg) size[g]!];
+      // yeni büyüklükler sonradan komşuyla çakışmış olabilir
+      var conflict = false;
+      for (var i = 0; i < s * s && !conflict; i++) {
+        for (final nb in [if (i % s < s - 1) i + 1, if (i ~/ s < s - 1) i + s]) {
+          if (reg[i] != reg[nb] && sol[i] == sol[nb]) conflict = true;
+        }
+      }
+      if (conflict) continue;
+      final mx = sol.reduce(math.max);
+      return PLevel(kind: this.id, w: s, h: s, clues: const [], solCells: sol, givens: List.filled(s * s, -1), param: mx);
     }
     throw StateError('fillomino');
   }

@@ -286,6 +286,9 @@ class FenceKind extends BorderRegionKind {
 /// dikdörtgenin alanıdır.
 class RectKind extends BorderRegionKind {
   const RectKind();
+
+  @override
+  int get solveBudget => 150000;
   @override
   String get id => 'dikdortgenler';
 
@@ -426,6 +429,9 @@ int _pairKey(int a, int b, int k) => a < b ? a * (k + 1) + b : b * (k + 1) + a;
 /// Her sayı çifti tam bir kez kullanılır. Bağlar dominoları gösterir.
 class DominoPairKind extends PuzzleKind {
   const DominoPairKind();
+
+  @override
+  int get solveBudget => 150000;
   @override
   String get id => 'dominosa';
 
@@ -767,6 +773,9 @@ class PipeKind extends PuzzleKind {
 /// Bazı bölgeler boyalı verilir.
 class MapColorKind extends PuzzleKind {
   const MapColorKind();
+
+  @override
+  int get solveBudget => 150000;
   @override
   String get id => 'harita-boyama';
 

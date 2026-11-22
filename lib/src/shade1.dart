@@ -70,7 +70,10 @@ abstract class ShadeKind extends PuzzleKind {
         }
       }
     }
-    return q.length == total;
+    for (var i = 0; i < lv.n; i++) {
+      if (v[i] == 0 && !seen[i] && (skip == null || !skip(i))) return false;
+    }
+    return total >= 0;
   }
 
   static bool shadedConnected(PLevel lv, List<int> v, {bool unknownCounts = true}) {
@@ -92,7 +95,10 @@ abstract class ShadeKind extends PuzzleKind {
         }
       }
     }
-    return q.length == total;
+    for (var i = 0; i < lv.n; i++) {
+      if (v[i] == 1 && !seen[i]) return false;
+    }
+    return total >= 0;
   }
 
   static bool noAdjacentShaded(PLevel lv, List<int> v) {
@@ -139,6 +145,9 @@ abstract class ShadeKind extends PuzzleKind {
 class NonogramKind extends PuzzleKind {
   final bool colored;
   const NonogramKind({this.colored = false});
+
+  @override
+  int get solveBudget => 150000;
 
   @override
   String get id => colored ? 'renkli-nonogram' : 'nonogram';
@@ -666,60 +675,67 @@ class IslandKind extends ShadeKind {
   @override
   PLevel make(int difficulty, SeededRandom r) {
     final n = const [5, 5, 6, 6, 7, 7, 8, 8, 9, 10][difficulty - 1];
+    final maxIsland = difficulty <= 4 ? 5 : 8;
     for (var attempt = 0; attempt < 300; attempt++) {
-      // tümü deniz; adaları büyüt
+      final probe = PLevel(kind: id, w: n, h: n, clues: List.filled(n * n, -1), givens: const []);
+      final isl = List.filled(n * n, -1); // ada kimliği, -1 deniz
+      final size = <int, int>{};
+      var next = 0;
       final v = List.filled(n * n, 1);
-      final clues = List.filled(n * n, -1);
-      final probe = PLevel(kind: id, w: n, h: n, clues: clues, givens: const []);
-      final islands = (n * n * 0.13).round() + r.nextInt(3);
-      for (var k = 0; k < islands * 3; k++) {
-        final s = r.nextInt(n * n);
-        if (v[s] == 0 || probe.neighbors(s).any((nb) => v[nb] == 0)) continue;
-        final size = 1 + r.nextInt(difficulty <= 4 ? 4 : 6);
-        final cells = [s];
-        v[s] = 0;
-        while (cells.length < size) {
-          final cand = <int>[];
-          for (final c in cells) {
-            for (final nb in probe.neighbors(c)) {
-              if (v[nb] == 1 && probe.neighbors(nb).every((m) => v[m] == 1 || cells.contains(m))) cand.add(nb);
-            }
-          }
-          if (cand.isEmpty) break;
-          final c = cand[r.nextInt(cand.length)];
-          v[c] = 0;
-          cells.add(c);
-          if (!ShadeKind.shadedConnected(probe, v, unknownCounts: false)) {
-            v[c] = 1;
-            cells.remove(c);
-            break;
-          }
+      bool tryCell(int c) {
+        final ids = {for (final nb in probe.neighbors(c)) if (isl[nb] >= 0) isl[nb]};
+        if (ids.length > 1) return false;
+        final g = ids.isEmpty ? next : ids.first;
+        if ((size[g] ?? 0) + 1 > maxIsland) return false;
+        v[c] = 0;
+        if (!ShadeKind.shadedConnected(probe, v, unknownCounts: false) || [for (var i = 0; i < n * n; i++) if (v[i] == 1) i].isEmpty) {
+          v[c] = 1;
+          return false;
         }
-        clues[cells[r.nextInt(cells.length)]] = cells.length;
+        isl[c] = g;
+        size[g] = (size[g] ?? 0) + 1;
+        if (ids.isEmpty) next++;
+        return true;
       }
-      if (!ShadeKind.no2x2(probe, v, 1)) {
-        // 2x2 deniz bloklarını tek hücrelik adayla kır
-        var fixed = true;
-        for (var y = 0; y + 1 < n && fixed; y++) {
+
+      // rastgele tohum adalar
+      for (final c in shuffled(n * n, r).take((n * n * 0.08).round() + 1)) {
+        if (isl[c] < 0 && probe.neighbors(c).every((nb) => isl[nb] < 0)) tryCell(c);
+      }
+      var stuck = false;
+      for (var guard = 0; guard < n * n * 4; guard++) {
+        // 2x2 deniz bloğu bul
+        var block = -1;
+        for (var y = 0; y + 1 < n && block < 0; y++) {
           for (var x = 0; x + 1 < n; x++) {
             final i = y * n + x;
             if (v[i] == 1 && v[i + 1] == 1 && v[i + n] == 1 && v[i + n + 1] == 1) {
-              final opts = [i, i + 1, i + n, i + n + 1].where((c) => probe.neighbors(c).every((m) => v[m] == 1)).toList();
-              if (opts.isEmpty) {
-                fixed = false;
-                break;
-              }
-              final c = opts[r.nextInt(opts.length)];
-              v[c] = 0;
-              clues[c] = 1;
-              if (!ShadeKind.shadedConnected(probe, v, unknownCounts: false)) {
-                fixed = false;
-                break;
-              }
+              block = i;
+              break;
             }
           }
         }
-        if (!fixed || !ShadeKind.no2x2(probe, v, 1)) continue;
+        if (block < 0) break;
+        final cells = [block, block + 1, block + n, block + n + 1];
+        r.shuffle(cells);
+        if (!cells.any(tryCell)) {
+          stuck = true;
+          break;
+        }
+      }
+      if (stuck || !ShadeKind.no2x2(probe, v, 1)) continue;
+      // bazı adaları biraz daha büyüt
+      for (var t = 0; t < n * 2; t++) {
+        final c = r.nextInt(n * n);
+        if (v[c] == 1 && probe.neighbors(c).any((nb) => isl[nb] >= 0)) tryCell(c);
+      }
+      final clues = List.filled(n * n, -1);
+      final groups = <int, List<int>>{};
+      for (var i = 0; i < n * n; i++) {
+        if (isl[i] >= 0) groups.putIfAbsent(isl[i], () => []).add(i);
+      }
+      for (final g in groups.values) {
+        clues[g[r.nextInt(g.length)]] = g.length;
       }
       final lv = PLevel(kind: id, w: n, h: n, clues: clues, solCells: v, givens: List.filled(n * n, -1));
       if (ok(lv, PState(v, const [], const []), true)) return lv;
@@ -820,28 +836,29 @@ class RoomsKind extends ShadeKind {
         v[i] = 1;
         if (!ShadeKind.whitesConnected(probe, v, unknownCounts: false)) v[i] = 0;
       }
-      // şerit kuralını boz(an) uzun beyazları karala
-      if (!ok(probe, PState(v, const [], const []), true)) {
-        var fixedAll = true;
-        for (var pass = 0; pass < 30 && !ok(probe, PState(v, const [], const []), true); pass++) {
-          var did = false;
-          for (final i in shuffled(n * n, r)) {
-            if (v[i] == 1 || probe.neighbors(i).any((nb) => v[nb] == 1)) continue;
-            v[i] = 1;
-            if (!ShadeKind.whitesConnected(probe, v, unknownCounts: false)) {
-              v[i] = 0;
-              continue;
-            }
-            did = true;
-            break;
+      // şerit kuralını bozan uzun beyaz şeritleri ortadan karala
+      var fixedAll = true;
+      for (var pass = 0; pass < 60; pass++) {
+        final strip = _badStrip(probe, v);
+        if (strip == null) break;
+        var did = false;
+        r.shuffle(strip);
+        for (final i in strip) {
+          if (v[i] == 1 || probe.neighbors(i).any((nb) => v[nb] == 1)) continue;
+          v[i] = 1;
+          if (!ShadeKind.whitesConnected(probe, v, unknownCounts: false)) {
+            v[i] = 0;
+            continue;
           }
-          if (!did) {
-            fixedAll = false;
-            break;
-          }
+          did = true;
+          break;
         }
-        if (!fixedAll || !ok(probe, PState(v, const [], const []), true)) continue;
+        if (!did) {
+          fixedAll = false;
+          break;
+        }
       }
+      if (!fixedAll || !ok(probe, PState(v, const [], const []), true)) continue;
       final clues = List.filled(n * n, -1);
       final firsts = <int, int>{};
       for (var i = 0; i < n * n; i++) {
@@ -856,6 +873,33 @@ class RoomsKind extends ShadeKind {
     }
     throw StateError('heyawake');
   }
+}
+
+/// Üç odaya yayılan ilk beyaz şeridin ortadaki odalardaki hücreleri.
+List<int>? _badStrip(PLevel lv, List<int> v) {
+  for (var dir = 0; dir < 2; dir++) {
+    final lines = dir == 0 ? lv.h : lv.w;
+    final len = dir == 0 ? lv.w : lv.h;
+    for (var a = 0; a < lines; a++) {
+      var run = <int>[];
+      for (var b = 0; b <= len; b++) {
+        final i = b == len ? -1 : (dir == 0 ? a * lv.w + b : b * lv.w + a);
+        if (i >= 0 && v[i] == 0) {
+          run.add(i);
+          continue;
+        }
+        final regs = <int>[];
+        for (final c in run) {
+          if (regs.isEmpty || regs.last != lv.regions[c]) regs.add(lv.regions[c]);
+        }
+        if (regs.length > 2) {
+          return [for (final c in run) if (lv.regions[c] != regs.first && lv.regions[c] != regs.last) c];
+        }
+        run = [];
+      }
+    }
+  }
+  return null;
 }
 
 /// Dikdörtgen odalara bölme (özyinelemeli kesme).

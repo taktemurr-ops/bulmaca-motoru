@@ -11,6 +11,9 @@ abstract class DigitKind extends PuzzleKind {
   const DigitKind();
 
   @override
+  int get solveBudget => 150000;
+
+  @override
   CellInput get cellInput => CellInput.digits;
 
   @override
@@ -309,7 +312,7 @@ class KakuroKind extends DigitKind {
   @override
   PLevel make(int difficulty, SeededRandom r) {
     final (w, h) = _size(difficulty);
-    for (var attempt = 0; attempt < 80; attempt++) {
+    for (var attempt = 0; attempt < 300; attempt++) {
       final black = List.filled(w * h, false);
       for (var i = 0; i < w * h; i++) {
         if (i % w == 0 || i ~/ w == 0) black[i] = true;
@@ -339,7 +342,7 @@ class KakuroKind extends DigitKind {
         }
       }
       final whites = [for (var i = 0; i < w * h; i++) if (!black[i]) i];
-      if (whites.length < inner * 0.55) continue;
+      if (whites.length < inner * 0.4) continue;
       // Beyazlar bağlı olmalı
       final seen = <int>{whites.first};
       final q = [whites.first];
@@ -352,7 +355,7 @@ class KakuroKind extends DigitKind {
       if (seen.length != whites.length) continue;
       final clues = [for (var i = 0; i < w * h; i++) black[i] ? 0 : -1];
       var lv = PLevel(kind: id, w: w, h: h, clues: clues, extra: [List.filled(w * h, 0), List.filled(w * h, 0)], givens: List.filled(w * h, -1), param: 9);
-      final sol = randomFill(lv, r, 40000);
+      final sol = randomFill(lv, r, 20000);
       if (sol == null) continue;
       final across = List.filled(w * h, 0), down = List.filled(w * h, 0);
       for (var i = 0; i < w * h; i++) {
@@ -756,10 +759,10 @@ class GroupKind extends DigitKind {
   @override
   PLevel make(int difficulty, SeededRandom r) {
     final (w, h) = sizeFor(difficulty);
-    for (var attempt = 0; attempt < 60; attempt++) {
+    for (var attempt = 0; attempt < 400; attempt++) {
       final reg = _partition(w, h, 5, r);
       final lv0 = PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, givens: List.filled(w * h, -1), param: 5);
-      final sol = randomFill(lv0, r, 20000);
+      final sol = randomFill(lv0, r, 3000);
       if (sol == null) continue;
       return PLevel(kind: id, w: w, h: h, clues: const [], regions: reg, solCells: sol, givens: List.filled(w * h, -1), param: 5);
     }

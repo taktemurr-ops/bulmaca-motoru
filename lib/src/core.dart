@@ -339,6 +339,9 @@ abstract class PuzzleKind {
   /// (verilebilir hücrelerin kalan kısmına göre).
   double extraGivenRatio(int difficulty) => 0;
 
+  /// Benzersizlik aramasının bütçesi (genel çözücüde kural denetimi sayısı).
+  int get solveBudget => 40000;
+
   /// Benzersizlikten sonra kaç verilenin kaldırılması denenecek.
   int reduceTries(int difficulty) => 0;
 
@@ -437,36 +440,93 @@ int? genericCount(PuzzleKind k, PLevel lv, {int limit = 2, int budget = 200000})
   }
   final cellDom = [for (var i = 0; i < lv.n; i++) k.cellDomain(lv, i)];
   final linkDom = k.linkDomain(lv), borderDom = k.borderDomain(lv);
+  List<int> listOf(int layer) => layer == 0 ? s.cells : (layer == 1 ? s.links : s.borders);
+  List<int> domOf(int layer, int i) => layer == 0 ? cellDom[i] : (layer == 1 ? linkDom : borderDom);
   if (!k.ok(lv, s, vars.isEmpty)) return 0;
-  var count = 0, nodes = 0;
+  var count = 0, calls = 0;
   var over = false;
-  void go(int d) {
-    if (count >= limit || over) return;
-    if (d == vars.length) {
-      if (k.ok(lv, s, true)) count++;
-      return;
+  bool test() {
+    if (++calls > budget) {
+      over = true;
+      return false;
     }
-    final (layer, i) = vars[d];
-    final list = layer == 0 ? s.cells : (layer == 1 ? s.links : s.borders);
-    final dom = layer == 0 ? cellDom[i] : (layer == 1 ? linkDom : borderDom);
-    for (final v in dom) {
-      if (++nodes > budget) {
-        over = true;
-        break;
-      }
-      list[i] = v;
-      if (k.ok(lv, s, d + 1 == vars.length)) go(d + 1);
-      if (count >= limit || over) break;
-    }
-    list[i] = -1;
+    return k.ok(lv, s, false);
   }
 
-  go(0);
+  // Tekil değer yayılımı: yalnız bir değeri kurala uyan değişkeni ata.
+  bool propagate(List<(int, int)> trail) {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final (layer, i) in vars) {
+        final list = listOf(layer);
+        if (list[i] >= 0) continue;
+        var good = 0, last = -1;
+        for (final v in domOf(layer, i)) {
+          list[i] = v;
+          final t = test();
+          list[i] = -1;
+          if (over) return false;
+          if (t) {
+            good++;
+            last = v;
+            if (good > 1) break;
+          }
+        }
+        if (good == 0) return false;
+        if (good == 1) {
+          list[i] = last;
+          trail.add((layer, i));
+          changed = true;
+        }
+      }
+    }
+    return true;
+  }
+
+  void undo(List<(int, int)> trail) {
+    for (final (layer, i) in trail) {
+      listOf(layer)[i] = -1;
+    }
+  }
+
+  void go() {
+    if (count >= limit || over) return;
+    final trail = <(int, int)>[];
+    if (!propagate(trail)) {
+      undo(trail);
+      return;
+    }
+    (int, int)? pick;
+    for (final v in vars) {
+      if (listOf(v.$1)[v.$2] < 0) {
+        pick = v;
+        break;
+      }
+    }
+    if (pick == null) {
+      if (k.ok(lv, s, true)) count++;
+      undo(trail);
+      return;
+    }
+    final (layer, i) = pick;
+    final list = listOf(layer);
+    for (final v in domOf(layer, i)) {
+      list[i] = v;
+      if (test()) go();
+      list[i] = -1;
+      if (count >= limit || over) break;
+    }
+    undo(trail);
+  }
+
+  go();
   return over ? null : count;
 }
 
 /// Benzersiz çözüm için verilen ekleyerek bölümü bitirir.
-PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r, {int budget = 150000}) {
+PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r, {int? budget0}) {
+  final budget = budget0 ?? k.solveBudget;
   final layer = k.givenLayer;
   final sol = layer == 0 ? lv.solCells : (layer == 1 ? lv.solLinks : lv.solBorders);
   final total = sol.length;
@@ -475,12 +535,12 @@ PLevel finishWithGivens(PuzzleKind k, PLevel lv, int difficulty, SeededRandom r,
   PLevel build() => layer == 0
       ? lv.withGivens(g)
       : (layer == 1 ? lv.withGivens(List.filled(lv.n, -1), g) : lv.withGivens(List.filled(lv.n, -1), null, g));
-  final order = [for (var i = 0; i < total; i++) i]..removeWhere((i) => g[i] >= 0 || (layer == 0 && !k.canGive(lv, i)));
+  final order = [for (var i = 0; i < total; i++) i]..removeWhere((i) => g[i] >= 0 || (layer == 0 && !k.canGive(lv, i)) || (layer > 0 && sol[i] <= 0));
   r.shuffle(order);
   var cur = build();
   final maxGive = (order.length * k.maxGivenRatio(difficulty)).round();
   var given = 0;
-  for (var round = 0; round < 60; round++) {
+  for (var round = 0; round < 200; round++) {
     final c = k.countSolutions(cur, budget: budget);
     if (c == 1) {
       // Zor bölümlerde gereksiz verilenleri ayıkla.

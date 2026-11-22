@@ -591,7 +591,6 @@ class ArrowLoopKind extends PuzzleKind {
         v[i] = 1;
       }
       final dirs = List.filled(n * n, 0);
-      var bad = false;
       for (final i in off) {
         if (v[i] == 1) continue;
         // ipucu hücresi: rastgele yön ve sayı
@@ -607,7 +606,6 @@ class ArrowLoopKind extends PuzzleKind {
         clues[i] = cnt;
         dirs[i] = dir;
       }
-      if (bad) continue;
       // ek ipuçları: bazı karaların yerine değil, döngü dışı yoksa yine de
       if (clues.where((c) => c >= 0).isEmpty) {
         // en az bir ipucu: karalardan birini ipucuna çevir olmaz; köşe karayı yönle say

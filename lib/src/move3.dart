@@ -744,8 +744,11 @@ class LinePhysicsKind extends MoveKind {
       final tx = right ? cx : cx + cupW - 1, ty = cy - 2;
       final dx = (tx - bx).abs();
       final sy = ty - dx;
-      if (sy < by + 2) continue;
-      final path = <int>[];
+      if (sy - 1 < by + 2) continue;
+      // rampa topun bir sütun gerisinden başlar (top uç noktada dengede kalmasın)
+      final back = bx + (right ? -1 : 1);
+      if (back < 0 || back >= w) continue;
+      final path = <int>[(sy - 1) * w + back];
       var x = bx, y = sy;
       path.add(y * w + x);
       while (x != tx) {

@@ -23,6 +23,9 @@ class SortKind extends MoveKind {
   String get id => const ['su-siralama', 'top-siralama', 'vida-sokme', 'altigen-siralama'][mode];
 
   @override
+  double cellAspect(PLevel lv) => lv.h <= 4 ? 1.6 : (lv.h <= 6 ? 1.35 : 1.15);
+
+  @override
   PState initial(PLevel lv) => PState(List.of(lv.extra[0]), List.filled(lv.linkCount, 0), List.filled(lv.borderCount, 0), [-1]);
 
   static List<List<int>> tubes(List<int> c, int w, int h) => [

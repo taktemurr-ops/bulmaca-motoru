@@ -100,19 +100,20 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   // ---- geometri
   late double _cs;
+  double _csy = 1;
   late Offset _origin;
 
-  Rect _cell(int i) => Rect.fromLTWH(_origin.dx + (i % lv.w) * _cs, _origin.dy + (i ~/ lv.w) * _cs, _cs, _cs);
+  Rect _cell(int i) => Rect.fromLTWH(_origin.dx + (i % lv.w) * _cs, _origin.dy + (i ~/ lv.w) * _csy, _cs, _csy);
 
   int? _cellAt(Offset p) {
-    final x = ((p.dx - _origin.dx) / _cs).floor(), y = ((p.dy - _origin.dy) / _cs).floor();
+    final x = ((p.dx - _origin.dx) / _cs).floor(), y = ((p.dy - _origin.dy) / _csy).floor();
     if (x < 0 || y < 0 || x >= lv.w || y >= lv.h) return null;
     return y * lv.w + x;
   }
 
   /// Izgara dışındaki dokunuş: (taraf, sıra).
   (int, int)? _outsideAt(Offset p) {
-    final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _cs;
+    final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _csy;
     if (fx >= 0 && fx < lv.w && fy < 0 && fy > -2.5) return (0, fx.floor());
     if (fx >= 0 && fx < lv.w && fy >= lv.h && fy < lv.h + 2.5) return (2, fx.floor());
     if (fy >= 0 && fy < lv.h && fx < 0 && fx > -2.5) return (1, fy.floor());
@@ -180,7 +181,7 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   /// En yakın kenar (dokunma kenara yeterince yakınsa).
   int? _edgeAt(Offset p) {
-    final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _cs;
+    final fx = (p.dx - _origin.dx) / _cs, fy = (p.dy - _origin.dy) / _csy;
     if (fx < -0.3 || fy < -0.3 || fx > lv.w + 0.3 || fy > lv.h + 0.3) return null;
     final rx = (fx - fx.round()).abs(), ry = (fy - fy.round()).abs();
     const tol = 0.28;
@@ -505,7 +506,7 @@ class _PuzzleViewState extends State<PuzzleView> {
           const SizedBox(width: 4),
           Text('${_seconds ~/ 60}:${(_seconds % 60).toString().padLeft(2, '0')}'),
           const SizedBox(width: 12),
-          Expanded(child: Text(status, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
+          Expanded(child: FittedBox(fit: BoxFit.scaleDown, child: Text(status, maxLines: 1, textAlign: TextAlign.center))),
           IconButton(tooltip: bt(lang, 'undo'), onPressed: _undo.isEmpty ? null : _undoMove, icon: const Icon(Icons.undo)),
           IconButton(tooltip: bt(lang, 'clear'), onPressed: _clear, icon: const Icon(Icons.restart_alt)),
           if (kind.hintable) IconButton(tooltip: bt(lang, 'hint'), onPressed: _hint, icon: const Icon(Icons.lightbulb_outline)),
@@ -514,10 +515,12 @@ class _PuzzleViewState extends State<PuzzleView> {
       Expanded(
         child: LayoutBuilder(builder: (context, box) {
           final cols = lv.w + ml + mr, rows = lv.h + mt + mb;
-          _cs = math.min((box.maxWidth - 16) / cols, (box.maxHeight - 16) / rows);
-          final bw = _cs * cols, bh = _cs * rows;
+          final asp = kind.cellAspect(lv);
+          _cs = math.min((box.maxWidth - 16) / cols, (box.maxHeight - 16) / (rows * asp));
+          _csy = _cs * asp;
+          final bw = _cs * cols, bh = _csy * rows;
           final left = (box.maxWidth - bw) / 2, top = (box.maxHeight - bh) / 2;
-          _origin = Offset(left + ml * _cs, top + mt * _cs);
+          _origin = Offset(left + ml * _cs, top + mt * _csy);
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (d) => _tapAt(d.localPosition),
@@ -545,6 +548,7 @@ class _PuzzleViewState extends State<PuzzleView> {
                 kind: kind,
                 st: st,
                 cs: _cs,
+                csy: _csy,
                 origin: _origin,
                 sel: digits ? _sel : null,
                 path: List.of(_path),
@@ -649,6 +653,7 @@ class _GridPainter extends CustomPainter {
   final PuzzleKind kind;
   final PState st;
   final double cs;
+  final double csy;
   final Offset origin;
   final int? sel;
   final List<int> path;
@@ -661,6 +666,7 @@ class _GridPainter extends CustomPainter {
     required this.kind,
     required this.st,
     required this.cs,
+    this.csy = 0,
     required this.origin,
     required this.sel,
     required this.path,
@@ -672,17 +678,18 @@ class _GridPainter extends CustomPainter {
     required this.lang,
   });
 
-  Rect cell(int i) => Rect.fromLTWH(origin.dx + (i % lv.w) * cs, origin.dy + (i ~/ lv.w) * cs, cs, cs);
+  double get _cy => csy > 0 ? csy : cs;
+  Rect cell(int i) => Rect.fromLTWH(origin.dx + (i % lv.w) * cs, origin.dy + (i ~/ lv.w) * _cy, cs, _cy);
 
   Offset vertex(int v) => origin + Offset((v % (lv.w + 1)) * cs, (v ~/ (lv.w + 1)) * cs);
 
   @override
   void paint(Canvas c, Size size) {
-    final board = Rect.fromLTWH(origin.dx, origin.dy, lv.w * cs, lv.h * cs);
+    final board = Rect.fromLTWH(origin.dx, origin.dy, lv.w * cs, lv.h * _cy);
     final (pt, pl, pb, pr) = kind.margins(lv);
     if (pt + pl + pb + pr > 0) {
       // İpuçları koyu mürekkeple yazılır: koyu dünya arka planında da okunsun diye kenar şeridi açık zemin.
-      final outer = Rect.fromLTRB(board.left - pl * cs, board.top - pt * cs, board.right + pr * cs, board.bottom + pb * cs);
+      final outer = Rect.fromLTRB(board.left - pl * cs, board.top - pt * _cy, board.right + pr * cs, board.bottom + pb * _cy);
       c.drawRRect(RRect.fromRectAndRadius(outer.inflate(cs * 0.12), Radius.circular(cs * 0.25)), Paint()..color = paper.withValues(alpha: 0.9));
     }
     c.drawRRect(RRect.fromRectAndRadius(board.inflate(cs * 0.08), Radius.circular(cs * 0.18)), Paint()..color = paper);

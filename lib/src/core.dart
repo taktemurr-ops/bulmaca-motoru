@@ -258,6 +258,10 @@ abstract class PuzzleKind {
 
   String get id;
 
+  /// Hücre yüksekliği / genişliği. Tüp sıralama gibi dar ve uzun tahtalar
+  /// ekranı doldursun diye 1'den büyük olabilir.
+  double cellAspect(PLevel lv) => 1;
+
   CellInput get cellInput => CellInput.cycle;
 
   /// cycle türlerinde durum sayısı (0 boş dahil). digits türlerinde en büyük rakam + 1.

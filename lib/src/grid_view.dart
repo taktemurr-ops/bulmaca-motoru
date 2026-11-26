@@ -9,6 +9,7 @@ import 'package:studio_core/core/game_rules.dart';
 import 'core.dart';
 import 'symbols.dart';
 import 'texts.dart';
+import 'studio_chrome.dart';
 
 /// Bütün ızgara bulmacaları için ortak ekran.
 class PuzzleView extends StatefulWidget {
@@ -490,7 +491,14 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   @override
   Widget build(BuildContext context) {
+    // Tahta (kâğıt, mürekkep) oyunun alışılmış temasıyla çizilir; çevresindeki
+    // arayüz (üst bilgi, rakam takımı, palet) onaylı stüdyo temasıyla.
     final scheme = Theme.of(context).colorScheme;
+    return StudioChrome(child: Builder(builder: (context) => _build(context, scheme)));
+  }
+
+  Widget _build(BuildContext context, ColorScheme scheme) {
+    final look = StudioLook.of(context);
     final lang = ctx.lang;
     final status = kind.status(lv, st, lang);
     final (mt, ml, mb, mr) = kind.margins(lv);
@@ -498,15 +506,23 @@ class _PuzzleViewState extends State<PuzzleView> {
     final colors = kind.cellInput == CellInput.colors;
     return Column(children: [
       Container(
-        margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-        padding: const EdgeInsets.only(left: 10),
-        decoration: BoxDecoration(color: scheme.surface.withValues(alpha: 0.92), borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+        padding: const EdgeInsetsDirectional.only(start: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(colors: [look.sheet.withValues(alpha: 0.92), look.base.withValues(alpha: 0.92)]),
+          border: Border.all(color: look.accent.withValues(alpha: 0.45), width: 1.2),
+        ),
         child: Row(children: [
-          Icon(Icons.timer_outlined, size: 18, color: scheme.onSurface.withValues(alpha: 0.7)),
-          const SizedBox(width: 4),
-          Text('${_seconds ~/ 60}:${(_seconds % 60).toString().padLeft(2, '0')}'),
-          const SizedBox(width: 12),
-          Expanded(child: FittedBox(fit: BoxFit.scaleDown, child: Text(status, maxLines: 1, textAlign: TextAlign.center))),
+          StudioTag(icon: Icons.timer_outlined, text: '${_seconds ~/ 60}:${(_seconds % 60).toString().padLeft(2, '0')}'),
+          const SizedBox(width: 10),
+          Expanded(
+              child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(status,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: kStudioText, fontWeight: FontWeight.w800)))),
           IconButton(tooltip: bt(lang, 'undo'), onPressed: _undo.isEmpty ? null : _undoMove, icon: const Icon(Icons.undo)),
           IconButton(tooltip: bt(lang, 'clear'), onPressed: _clear, icon: const Icon(Icons.restart_alt)),
           if (kind.hintable) IconButton(tooltip: bt(lang, 'hint'), onPressed: _hint, icon: const Icon(Icons.lightbulb_outline)),
@@ -572,6 +588,7 @@ class _PuzzleViewState extends State<PuzzleView> {
   Widget _numberPad(ColorScheme scheme) {
     final max = kind.cellStates(lv) - 1;
     final values = kind.padValues(lv, st) ?? [for (var v = 1; v <= max; v++) v];
+    final w = values.length > 8 ? 34.0 : 44.0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Wrap(
@@ -580,29 +597,22 @@ class _PuzzleViewState extends State<PuzzleView> {
         runSpacing: 4,
         children: [
           for (final v in values)
-            SizedBox(
-              width: values.length > 12 ? 34 : (values.length > 8 ? 34 : 44),
-              height: 46,
-              child: FilledButton.tonal(
-                style: FilledButton.styleFrom(padding: EdgeInsets.zero),
-                onPressed: () => _digit(v),
-                child: Text(kind.digitLabel(v), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-              ),
+            _PadKey(
+              width: w,
+              onTap: () => _digit(v),
+              child: Text(kind.digitLabel(v),
+                  style: const TextStyle(color: kStudioText, fontSize: 20, fontWeight: FontWeight.w800)),
             ),
-          SizedBox(
+          _PadKey(
             width: 44,
-            height: 46,
-            child: FilledButton.tonal(
-              style: FilledButton.styleFrom(padding: EdgeInsets.zero),
-              onPressed: () {
-                final i = _sel;
-                if (i == null || _locked(i) || st.cells[i] == 0) return;
-                _push();
-                setState(() => st.cells[i] = 0);
-                _persist();
-              },
-              child: Icon(Icons.backspace_outlined, semanticLabel: bt(ctx.lang, 'erase')),
-            ),
+            onTap: () {
+              final i = _sel;
+              if (i == null || _locked(i) || st.cells[i] == 0) return;
+              _push();
+              setState(() => st.cells[i] = 0);
+              _persist();
+            },
+            child: Icon(Icons.backspace_outlined, color: kStudioText, semanticLabel: bt(ctx.lang, 'erase')),
           ),
         ],
       ),
@@ -623,13 +633,48 @@ class _PuzzleViewState extends State<PuzzleView> {
               decoration: BoxDecoration(
                 color: puzzleColor(v),
                 shape: BoxShape.circle,
-                border: Border.all(color: v == _brush ? Colors.white : Colors.white24, width: v == _brush ? 4 : 1),
+                border: Border.all(
+                    color: v == _brush ? StudioLook.of(context).accent : Colors.white38, width: v == _brush ? 4 : 1.2),
                 boxShadow: v == _brush ? const [BoxShadow(color: Colors.black54, blurRadius: 6)] : null,
               ),
               child: ctx.colorBlind ? Center(child: Text('$v', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))) : null,
             ),
           ),
       ]),
+    );
+  }
+}
+
+/// Rakam takımının tuşu: koyu degrade kare, vurgu kenarı, beyaz rakam.
+class _PadKey extends StatelessWidget {
+  final double width;
+  final VoidCallback onTap;
+  final Widget child;
+  const _PadKey({required this.width, required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final look = StudioLook.of(context);
+    final r = BorderRadius.circular(12);
+    return SizedBox(
+      width: width,
+      height: 46,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: r,
+        child: InkWell(
+          borderRadius: r,
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: r,
+              gradient: look.tile,
+              border: Border.all(color: look.accent.withValues(alpha: 0.5), width: 1.2),
+            ),
+            child: Center(child: child),
+          ),
+        ),
+      ),
     );
   }
 }

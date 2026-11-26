@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:studio_core/core/game_rules.dart';
+import 'package:studio_core/core/global_daily.dart';
 import 'package:studio_core/core/level_plan.dart';
 import 'package:studio_core/core/missions.dart';
 import 'package:studio_core/core/rng.dart';
@@ -667,6 +668,15 @@ class PuzzleRules extends GameRules<PLevel> {
 
   @override
   int get levelCount => levels;
+
+  /// Günün Bulmacası: bütün bulmaca türleri katılır (süre/hamle sıralaması).
+  @override
+  bool get globalDaily => true;
+
+  /// Herkese aynı günlük bulmaca: pazartesi kolay, hafta sonu zor (4–7).
+  /// Tohum yalnızca oyun ve UTC gününden gelir; çözümü tek olan bulmaca kurulur.
+  @override
+  LevelSpec globalDailySpec(String utcDay) => GlobalDaily.defaultSpec(gameId, utcDay);
 
   @override
   List<String> get optionalMechanics => const [];

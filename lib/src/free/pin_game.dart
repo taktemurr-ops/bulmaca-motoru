@@ -227,8 +227,10 @@ class PinGame extends FreeGame {
       s.at[s.cell[id]] = id;
     }
     s.prev = List.of(s.cell);
-    s.steps = (j['st'] as num).toInt();
+    final steps = (j['st'] as num).toInt();
+    s.steps = steps;
     s.settle();
+    s.steps = steps;
     s.prev = List.of(s.cell);
     sim = s;
     moves = (j['m'] as num).toInt();

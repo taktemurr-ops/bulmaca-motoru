@@ -584,7 +584,10 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
     final look = StudioLook.of(context);
     final style = BoardStyle.of(widget.rules.gameId, kind.id, scheme.primary);
     final lang = ctx.lang;
-    final status = kind.status(lv, st, lang);
+    // Durum satırı boşsa zorluk adı gösterilir (Sudoku.com'daki gibi).
+    final own = kind.status(lv, st, lang);
+    final d = widget.rules.mapDifficulty(campaignDifficulty(ctx.spec));
+    final status = own.isNotEmpty ? own : bt(lang, d <= 2 ? 'easy' : (d <= 4 ? 'medium' : (d <= 7 ? 'hard' : 'expert')));
     final (mt, ml, mb, mr) = kind.margins(lv);
     final digits = kind.cellInput == CellInput.digits;
     final colors = kind.cellInput == CellInput.colors;

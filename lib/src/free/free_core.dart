@@ -3,6 +3,7 @@ import 'package:studio_core/core/level_plan.dart';
 import 'package:studio_core/core/missions.dart';
 import 'package:studio_core/core/rng.dart';
 import 'package:studio_core/core/stats.dart';
+import '../core.dart' show campaignDifficulty;
 
 /// Serbest biçimli bulmaca bölümü (ızgara dışı oyunlar: domino koşulları,
 /// pim çekme, tuzaklı bilmeceler). Türe özgü veriler JSON uyumlu sözlükte.
@@ -71,7 +72,7 @@ class FreeRules extends GameRules<FLevel> {
 
   @override
   FLevel generate(LevelSpec spec) {
-    final d = spec.difficulty.clamp(1, 10);
+    final d = campaignDifficulty(spec).clamp(1, 10);
     try {
       return logic.make(d, SeededRandom(mixSeed([spec.seed, 8117])));
     } catch (_) {

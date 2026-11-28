@@ -37,6 +37,9 @@ abstract class DigitKind extends PuzzleKind {
   List<List<int>> peers(PLevel lv) => _peerCache[lv] ??= peersFor(lv);
 
   @override
+  List<int> digitPeers(PLevel lv, int i) => i < lv.n ? peers(lv)[i] : const [];
+
+  @override
   bool canGive(PLevel lv, int i) => active(lv, i);
 
   @override
@@ -423,6 +426,9 @@ class CalcBoxKind extends DigitKind {
   @override
   List<List<int>> peersFor(PLevel lv) => DigitKind.latinPeers(lv.w, lv.h);
 
+  @override
+  int digitQuota(PLevel lv) => lv.w;
+
   static final _cageOf = Expando<List<List<int>>>();
   List<List<int>> cageOf(PLevel lv) => _cageOf[lv] ??= () {
         final out = List<List<int>>.filled(lv.n, const []);
@@ -574,6 +580,9 @@ class InequalityKind extends DigitKind {
   @override
   List<List<int>> peersFor(PLevel lv) => DigitKind.latinPeers(lv.w, lv.h);
 
+  @override
+  int digitQuota(PLevel lv) => lv.w;
+
   static final _rel = Expando<List<List<(int, bool)>>>();
   List<List<(int, bool)>> rel(PLevel lv) => _rel[lv] ??= () {
         final out = [for (var i = 0; i < lv.n; i++) <(int, bool)>[]];
@@ -651,6 +660,9 @@ class SkylineKind extends DigitKind {
 
   @override
   List<List<int>> peersFor(PLevel lv) => DigitKind.latinPeers(lv.w, lv.h);
+
+  @override
+  int digitQuota(PLevel lv) => lv.w;
 
   static int seen(List<int> vals) {
     var mx = 0, c = 0;

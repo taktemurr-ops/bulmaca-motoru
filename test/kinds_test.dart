@@ -9,7 +9,7 @@ void main() {
     test('$id: üretim, doğrulama, çözüm kabulü', () {
       final rules = gridRules('oyun-$id', id);
       final planner = LevelPlanner(gameId: 'oyun-$id', optionalMechanics: const []);
-      for (final lv in [1, 800, 6000, 40000, 99000]) {
+      for (final lv in [1, 5, 10, 800, 6000, 40000, 99000]) {
         final sw = Stopwatch()..start();
         final gl = rules.build(planner.spec(lv));
         final ms = sw.elapsedMilliseconds;

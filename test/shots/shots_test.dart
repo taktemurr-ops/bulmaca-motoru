@@ -35,6 +35,19 @@ Future<void> _fonts() async {
     }
     await l.load();
   }
+  // Arapça (RTL) ve CJK görüntüleri için sistem Noto yazı tipleri (CI'da kurulur).
+  const extra = {
+    'NotoArabic': '/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf',
+    'NotoCJK': '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  };
+  for (final e in extra.entries) {
+    final f = File(e.value);
+    if (!f.existsSync()) continue;
+    for (final fam in [e.key, 'FlutterTest', 'Roboto']) {
+      final l = FontLoader(fam)..addFont(Future.value(f.readAsBytesSync().buffer.asByteData()));
+      await l.load();
+    }
+  }
   final icons = FontLoader('MaterialIcons');
   for (final f in files.where((f) => f.path.contains('MaterialIcons'))) {
     icons.addFont(Future.value(f.readAsBytesSync().buffer.asByteData()));
@@ -42,7 +55,7 @@ Future<void> _fonts() async {
   await icons.load();
 }
 
-PlayContext _ctx(GeneratedLevel gl) => PlayContext(
+PlayContext _ctx(GeneratedLevel gl, [String lang = 'tr']) => PlayContext(
       spec: gl.spec,
       generated: gl,
       resume: const {},
@@ -51,7 +64,7 @@ PlayContext _ctx(GeneratedLevel gl) => PlayContext(
       colorBlind: false,
       reducedMotion: false,
       leftHanded: false,
-      lang: 'tr',
+      lang: lang,
       t: (k, [p = const {}]) => k,
       finish: (_) {},
       saveResume: (_) {},
@@ -63,16 +76,20 @@ PlayContext _ctx(GeneratedLevel gl) => PlayContext(
 
 final _key = GlobalKey();
 
-Widget _host(Widget child, Color seed) => RepaintBoundary(
+Widget _host(Widget child, Color seed, [String lang = 'tr']) => RepaintBoundary(
       key: _key,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(colorSchemeSeed: seed, fontFamily: 'Roboto', extensions: [StudioLook.fromSeed(seed)]),
+        theme: ThemeData(
+            colorSchemeSeed: seed,
+            fontFamily: 'Roboto',
+            fontFamilyFallback: const ['NotoArabic', 'NotoCJK'],
+            extensions: [StudioLook.fromSeed(seed)]),
         home: Scaffold(
           body: DecoratedBox(
             decoration: const BoxDecoration(
                 gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1B2347), Color(0xFF2B3C78)])),
-            child: SafeArea(child: child),
+            child: SafeArea(child: Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child)),
           ),
         ),
       ),
@@ -157,6 +174,21 @@ void main() {
             await t.pump(const Duration(milliseconds: 450));
             await _snap(t, '${id}_L${lv}_${dev.$1}_2cozum');
           }
+          await t.pumpWidget(const SizedBox());
+          await t.pump(const Duration(seconds: 2));
+        }
+      }
+      // Dil: Arapça (RTL) ve Japonca birer görüntü (ilk tür, 5. bölüm).
+      if (id == ids.first) {
+        t.view.physicalSize = const Size(393, 852);
+        t.view.devicePixelRatio = 1;
+        for (final lang in const ['ar', 'ja']) {
+          final rules = gridRules('oyun-$id', id);
+          final planner = LevelPlanner(gameId: rules.gameId, optionalMechanics: const []);
+          final gl = rules.build(planner.spec(5));
+          await t.pumpWidget(_host(PuzzleView(key: ValueKey('$id$lang'), ctx: _ctx(gl, lang), rules: rules), _seeds[id] ?? const Color(0xFF5468B8), lang));
+          await t.pump(const Duration(milliseconds: 200));
+          await _snap(t, '${id}_L5_p_dil_$lang');
           await t.pumpWidget(const SizedBox());
           await t.pump(const Duration(seconds: 2));
         }

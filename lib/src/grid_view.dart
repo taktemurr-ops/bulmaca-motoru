@@ -465,9 +465,13 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
   void _digit(int v) {
     final i = _sel;
     if (i == null || _ended || _locked(i)) return;
-    if (_noteMode && kind.notesFor(lv) && st.cells[i] <= 0) {
+    if (_noteMode && kind.notesFor(lv)) {
       _push();
-      setState(() => _notes[i] ^= 1 << v);
+      setState(() {
+        // Not kipinde dolu hücreye not yazılırsa rakam kalkar, not girer.
+        if (st.cells[i] > 0) st.cells[i] = 0;
+        _notes[i] ^= 1 << v;
+      });
       ctx.sfx(Sfx.tap);
       _persist();
       return;
@@ -895,7 +899,7 @@ class _ToolKey extends StatelessWidget {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, size: 20, color: kStudioText),
               const SizedBox(width: 6),
-              Text(on == null ? label : '$label ${lit ? '✓' : ''}'.trim(),
+              Text(label,
                   style: const TextStyle(color: kStudioText, fontWeight: FontWeight.w700, fontSize: 13)),
             ]),
           ),

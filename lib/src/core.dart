@@ -385,6 +385,9 @@ abstract class PuzzleKind {
   /// Bölgeleri renkle ayır.
   bool get tintRegions => false;
 
+  /// Bölge tonunun yoğunluğu (renk bölgeleri asıl ipucu olan türlerde güçlü).
+  double get regionTintStrength => 0.2;
+
   /// Hücre çizgileri (ızgara) gösterilsin mi.
   bool get gridLines => true;
 

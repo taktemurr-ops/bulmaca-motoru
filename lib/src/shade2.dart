@@ -22,6 +22,10 @@ class StarKind extends ShadeKind {
   @override
   Mark get onMark => queens ? Mark.gem : Mark.star;
 
+  /// Kraliçeler: renkli bölgeler asıl ipucu (LinkedIn Queens gibi canlı tonlar).
+  @override
+  double get regionTintStrength => queens ? 0.55 : 0.2;
+
   @override
   bool get tintRegions => true;
 

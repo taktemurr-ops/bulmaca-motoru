@@ -953,7 +953,7 @@ class _GridPainter extends CustomPainter {
     if (kind.tintRegions && lv.regions.isNotEmpty) {
       for (var i = 0; i < lv.n; i++) {
         final t = regionTint(lv.regions[i]);
-        c.drawRect(cell(i), Paint()..color = t);
+        c.drawRect(cell(i), Paint()..color = t.withValues(alpha: kind.regionTintStrength));
       }
     }
     final s0 = sel;

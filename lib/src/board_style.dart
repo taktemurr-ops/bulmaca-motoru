@@ -308,7 +308,8 @@ class BoardStyle {
         ..strokeWidth = math.max(1, cs * 0.02);
       c.drawRRect(rr.inflate(math.max(3, cs * 0.08)), p);
     }
-    if (frame == BoardFrame.tape) _paintTape(c, outer, cs);
+    // Bant yalnız kenar şeridi olmayan tahtalarda (şeritte tuhaf duruyordu).
+    if (frame == BoardFrame.tape && shadow) _paintTape(c, outer, cs);
   }
 
   void _paintFrame(Canvas c, RRect rr, double cs) {

@@ -451,6 +451,9 @@ abstract class PuzzleKind {
   /// Kenar türlerinde köşe noktaları gösterilsin mi.
   bool get showVertices => usesBorders;
 
+  /// Bağ çizgisinin kalınlığı (hücre boyuna oranla).
+  double get linkWidth => 0.16;
+
   /// Bağ rengi (null: vurgu rengi).
   Color? linkColor(PLevel lv, PState s, int l) => null;
 

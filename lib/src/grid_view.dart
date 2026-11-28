@@ -981,7 +981,7 @@ class _GridPainter extends CustomPainter {
             ..color = style.frameColor.withValues(alpha: 0.45)
             ..strokeWidth = 1.2);
     }
-    style.paintBoard(c, board, cs);
+    style.paintBoard(c, board, cs, shadow: pt + pl + pb + pr == 0);
     // Bölge tonları
     if (kind.tintRegions && lv.regions.isNotEmpty) {
       for (var i = 0; i < lv.n; i++) {
@@ -1109,7 +1109,7 @@ class _GridPainter extends CustomPainter {
         final color = kind.linkColor(lv, st, l) ?? accent;
         final p = Paint()
           ..color = color
-          ..strokeWidth = cs * (v == 2 ? 0.07 : 0.16)
+          ..strokeWidth = cs * (v == 2 ? 0.07 : kind.linkWidth)
           ..strokeCap = StrokeCap.round;
         if (v == 2) {
           final n = Offset(pb.dy - pa.dy, pa.dx - pb.dx);

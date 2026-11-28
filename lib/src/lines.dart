@@ -950,9 +950,43 @@ class PathLinkKind extends PuzzleKind {
     if (c == -2) return const CellLook(mark: Mark.wall);
     if (c > 0) {
       if (single) return CellLook(mark: c == 1 ? Mark.disc : Mark.ring);
-      return fill ? CellLook(color: 1 + (c - 1) % 9) : CellLook(text: '$c', tone: 1, mark: Mark.ring);
+      // Renk akışı: uçlar paintOver'da daire olarak çizilir (Flow tarzı).
+      return fill ? const CellLook() : CellLook(text: '$c', tone: 1, mark: Mark.ring);
     }
     return const CellLook();
+  }
+
+  @override
+  double get linkWidth => fill && !single ? 0.32 : 0.16;
+
+  /// Renk akışı: yolun geçtiği hücreler yolun renginde hafif boyanır.
+  @override
+  void paintUnder(Canvas c, PLevel lv, PState s, Rect Function(int i) cell, double cs) {
+    if (!fill || single) return;
+    final comp = linkComponents(lv, s.links);
+    final colOf = <int, Color>{};
+    for (var i = 0; i < lv.n; i++) {
+      if (lv.clues[i] > 0) colOf[comp[i]] = _pathColor(lv.clues[i]);
+    }
+    for (var i = 0; i < lv.n; i++) {
+      final col = colOf[comp[i]];
+      if (col == null) continue;
+      c.drawRect(cell(i).deflate(cs * 0.03), Paint()..color = col.withValues(alpha: 0.2));
+    }
+  }
+
+  /// Renk akışı: uç noktalar büyük renkli daireler.
+  @override
+  void paintOver(Canvas c, PLevel lv, PState s, Rect Function(int i) cell, double cs) {
+    if (!fill || single) return;
+    for (var i = 0; i < lv.n; i++) {
+      final k = lv.clues[i];
+      if (k <= 0) continue;
+      final o = cell(i).center;
+      c.drawCircle(o.translate(0, cs * 0.03), cs * 0.36, Paint()..color = const Color(0x33000000));
+      c.drawCircle(o, cs * 0.36, Paint()..color = _pathColor(k));
+      c.drawCircle(o.translate(-cs * 0.1, -cs * 0.1), cs * 0.1, Paint()..color = const Color(0x55FFFFFF));
+    }
   }
 
   @override

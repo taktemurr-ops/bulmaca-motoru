@@ -282,13 +282,13 @@ class BoardStyle {
 
   // ------------------------------------------------------------------ çizim
   /// Tahtanın zemini, dokusu ve çerçevesi.
-  void paintBoard(Canvas c, Rect board, double cs) {
+  void paintBoard(Canvas c, Rect board, double cs, {bool shadow = true}) {
     final pad = cs * 0.1;
     final outer = board.inflate(pad);
     final radius = Radius.circular(math.min(cs * 0.22, 18));
     final rr = RRect.fromRectAndRadius(outer, radius);
     // gölge
-    c.drawRRect(rr.shift(Offset(0, math.max(2, cs * 0.06))), Paint()..color = const Color(0x33000000));
+    if (shadow) c.drawRRect(rr.shift(Offset(0, math.max(2, cs * 0.06))), Paint()..color = const Color(0x33000000));
     // çerçeve (zeminin altında, dışa taşar)
     _paintFrame(c, rr, cs);
     // kâğıt

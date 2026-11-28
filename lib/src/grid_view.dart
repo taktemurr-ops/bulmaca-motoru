@@ -725,7 +725,10 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
         active: selVal == v,
         done: left == 0,
         onTap: () => _digit(v),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Büyük yazıda (x1.3) tuşa sığsın diye ölçeklenir.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(kind.digitLabel(v),
               style: TextStyle(
                   color: kStudioText,
@@ -733,7 +736,8 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
                   fontWeight: _noteMode && notes ? FontWeight.w600 : FontWeight.w800,
                   fontStyle: _noteMode && notes ? FontStyle.italic : FontStyle.normal)),
           if (left > 0) Text('$left', style: const TextStyle(color: kStudioTextDim, fontSize: 10, height: 1)),
-        ]),
+          ]),
+        ),
       );
     }
 

@@ -237,7 +237,7 @@ class KakuroKind extends DigitKind {
   @override
   String get id => 'kakuro';
 
-  static (int, int) _size(int d) => switch (d) { 1 || 2 => (5, 5), 3 || 4 => (6, 6), 5 || 6 => (7, 7), 7 || 8 => (8, 8), _ => (9, 9) };
+  static (int, int) _size(int d) => switch (d) { 1 => (5, 5), 2 => (6, 6), 3 || 4 => (7, 7), 5 || 6 => (8, 8), _ => (9, 9) };
 
   List<List<int>> runs(PLevel lv) => _runCache[lv] ??= _runs(lv);
   static final _runCache = Expando<List<List<int>>>();
@@ -326,7 +326,9 @@ class KakuroKind extends DigitKind {
       }
       // Rastgele siyahlar (simetrik)
       final inner = (w - 1) * (h - 1);
-      final want = (inner * (difficulty <= 3 ? 0.22 : 0.18)).round();
+      // Siyah yoğunluğu düşük tutulur: piyasadaki Kakuro'larda iç alanın
+      // yarıdan fazlası beyazdır (eskiden %30'a iniyordu, tahta boş kalıyordu).
+      final want = (inner * (difficulty <= 3 ? 0.13 : 0.11)).round();
       for (var k = 0; k < want; k++) {
         final x = 1 + r.nextInt(w - 1), y = 1 + r.nextInt(h - 1);
         black[y * w + x] = true;
@@ -349,7 +351,7 @@ class KakuroKind extends DigitKind {
         }
       }
       final whites = [for (var i = 0; i < w * h; i++) if (!black[i]) i];
-      if (whites.length < inner * 0.4) continue;
+      if (whites.length < inner * (attempt < 200 ? 0.55 : 0.45)) continue;
       // Beyazlar bağlı olmalı
       final seen = <int>{whites.first};
       final q = [whites.first];

@@ -766,8 +766,9 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
         ],
       ]),
     );
+    // Rakam sırası sağdan sola dillerde de 1→9 (sayı tuş takımı alışkanlığı).
     final row = values.length <= 10
-        ? Row(children: [
+        ? Row(textDirection: TextDirection.ltr, children: [
             for (final v in values)
               Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: key(v))),
           ])

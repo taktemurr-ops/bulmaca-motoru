@@ -58,6 +58,12 @@ class SudokuKind extends PuzzleKind {
   int cellStates(PLevel lv) => lv.param + 1;
 
   @override
+  List<int> digitPeers(PLevel lv, int i) => _SudokuSolver.peersOf(lv)[i];
+
+  @override
+  int digitQuota(PLevel lv) => lv.w;
+
+  @override
   double extraGivenRatio(int difficulty) => difficulty <= 2 ? 0.35 : (difficulty <= 4 ? 0.2 : (difficulty <= 6 ? 0.08 : 0));
 
   @override

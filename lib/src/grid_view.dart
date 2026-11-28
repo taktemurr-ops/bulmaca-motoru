@@ -6,6 +6,7 @@ import 'package:studio_core/app/game_api.dart';
 import 'package:studio_core/app/services/audio.dart';
 import 'package:studio_core/core/game_rules.dart';
 
+import 'board_style.dart';
 import 'core.dart';
 import 'symbols.dart';
 import 'texts.dart';
@@ -21,7 +22,7 @@ class PuzzleView extends StatefulWidget {
   State<PuzzleView> createState() => _PuzzleViewState();
 }
 
-class _PuzzleViewState extends State<PuzzleView> {
+class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateMixin {
   late PLevel lv;
   late PuzzleKind kind;
   late PState st;
@@ -35,6 +36,13 @@ class _PuzzleViewState extends State<PuzzleView> {
   int? _dragFrom;
   int? _paintValue;
   bool _dragged = false;
+  // kalem notları (aday rakamlar, bit maskesi) ve not kipi
+  late List<int> _notes;
+  bool _noteMode = false;
+  // karalama kalemi: 0 döngü, 1 doldur, 2 işaretle
+  int _pen = 0;
+  // çözüm kutlaması
+  late final AnimationController _win = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
 
   PlayContext get ctx => widget.ctx;
 
@@ -42,9 +50,10 @@ class _PuzzleViewState extends State<PuzzleView> {
   void initState() {
     super.initState();
     lv = (ctx.generated as GeneratedLevel<PLevel>).puzzle;
-    kind = widget.rules.kindForLevel(ctx.spec.difficulty);
+    kind = widget.rules.kindForSpec(ctx.spec);
     final snap = ctx.resume['snap'];
     st = (snap is String ? PState.restore(snap, lv) : null) ?? kind.initial(lv);
+    _notes = _parseNotes(ctx.resume['notes']);
     _seconds = (ctx.resume['secs'] as num?)?.toInt() ?? 0;
     _hints = (ctx.resume['hints'] as num?)?.toInt() ?? 0;
     _moves = (ctx.resume['moves'] as num?)?.toInt() ?? 0;
@@ -56,15 +65,32 @@ class _PuzzleViewState extends State<PuzzleView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _win.dispose();
     super.dispose();
   }
 
-  void _persist() => ctx.saveResume({'snap': st.serialize(), 'secs': _seconds, 'hints': _hints, 'moves': _moves});
+  List<int> _parseNotes(Object? o) {
+    final out = List<int>.filled(lv.n, 0);
+    if (o is String && o.isNotEmpty) {
+      final parts = o.split(',');
+      if (parts.length == lv.n) {
+        for (var i = 0; i < lv.n; i++) {
+          out[i] = int.tryParse(parts[i]) ?? 0;
+        }
+      }
+    }
+    return out;
+  }
+
+  String get _notesText => _notes.any((v) => v != 0) ? _notes.join(',') : '';
+
+  void _persist() =>
+      ctx.saveResume({'snap': st.serialize(), 'notes': _notesText, 'secs': _seconds, 'hints': _hints, 'moves': _moves});
 
   bool _locked(int i) => lv.givens.isNotEmpty && lv.givens[i] >= 0;
 
   void _push() {
-    _undo.add(st.serialize());
+    _undo.add('${st.serialize()}#$_notesText');
     if (_undo.length > 400) _undo.removeAt(0);
   }
 
@@ -74,17 +100,30 @@ class _PuzzleViewState extends State<PuzzleView> {
     if (kind.failed(lv, st)) {
       _ended = true;
       ctx.sfx(Sfx.lose);
-      Future.delayed(const Duration(milliseconds: 700), () {
+      Future.delayed(const Duration(milliseconds: 700), () async {
         if (!mounted) return;
+        // Piyasadaki örneklerdeki gibi "devam et" teklifi (reklam/jeton):
+        // kabul edilirse son hamle geri alınır ve oyun sürer.
+        final more = await ctx.requestContinue();
+        if (!mounted) return;
+        if (more && _undo.isNotEmpty) {
+          _ended = false;
+          _undoMove();
+          return;
+        }
         ctx.finish(RoundResult(won: false, seconds: _seconds, moves: _moves, hintsUsed: _hints));
       });
       return;
     }
     if (kind.solved(lv, st)) {
       _ended = true;
+      _sel = null;
       ctx.sfx(Sfx.win);
       final stars = _hints == 0 ? 3 : (_hints <= 2 ? 2 : 1);
-      Future.delayed(const Duration(milliseconds: 450), () {
+      // Kutlama: tahtanın üstünden ışık geçer, hücreler sırayla parlar
+      // (azaltılmış hareket seçiliyse yalnız kısa bekleme).
+      if (!ctx.reducedMotion) _win.forward(from: 0);
+      Future.delayed(Duration(milliseconds: ctx.reducedMotion ? 450 : 1250), () {
         if (!mounted) return;
         ctx.finish(RoundResult(
           won: true,
@@ -268,11 +307,21 @@ class _PuzzleViewState extends State<PuzzleView> {
         _changed();
       case CellInput.cycle:
         _push();
-        setState(() => kind.onTap(lv, st, i));
+        setState(() => _cycleTap(i));
         ctx.sfx(Sfx.place);
         _changed();
       case CellInput.none:
         break;
+    }
+  }
+
+  /// Döngülü hücre dokunuşu: kalem seçiliyse doldur/işaretle, yoksa türün döngüsü.
+  void _cycleTap(int i) {
+    if (_pen != 0 && kind.fillMarkTools(lv)) {
+      final v = _pen == 1 ? 1 : kind.markState;
+      st.cells[i] = st.cells[i] == v ? 0 : v;
+    } else {
+      kind.onTap(lv, st, i);
     }
   }
 
@@ -352,7 +401,7 @@ class _PuzzleViewState extends State<PuzzleView> {
     _paintValue = null;
     if (i != null && kind.cellInput == CellInput.cycle && !kind.dragLinks && kind.tapCell(lv, i)) {
       _push();
-      setState(() => kind.onTap(lv, st, i));
+      setState(() => _cycleTap(i));
       _paintValue = st.cells[i];
       _dragged = true;
     } else if (i != null && kind.cellInput == CellInput.colors && kind.tapCell(lv, i)) {
@@ -416,24 +465,55 @@ class _PuzzleViewState extends State<PuzzleView> {
   void _digit(int v) {
     final i = _sel;
     if (i == null || _ended || _locked(i)) return;
+    if (_noteMode && kind.notesFor(lv)) {
+      _push();
+      setState(() {
+        // Not kipinde dolu hücreye not yazılırsa rakam kalkar, not girer.
+        if (st.cells[i] > 0) st.cells[i] = 0;
+        _notes[i] ^= 1 << v;
+      });
+      ctx.sfx(Sfx.tap);
+      _persist();
+      return;
+    }
     _push();
-    setState(() => st.cells[i] = st.cells[i] == v ? 0 : v);
+    setState(() {
+      st.cells[i] = st.cells[i] == v ? 0 : v;
+      if (st.cells[i] > 0) _placed(i, v);
+    });
     ctx.sfx(Sfx.place);
     _changed();
   }
 
+  /// Yerleştirilen rakam: hücrenin notları silinir, aynı rakam komşu
+  /// hücrelerin notlarından düşer (piyasadaki Sudoku uygulamalarındaki gibi).
+  void _placed(int i, int v) {
+    _notes[i] = 0;
+    for (final j in kind.digitPeers(lv, i)) {
+      _notes[j] &= ~(1 << v);
+    }
+  }
+
   void _undoMove() {
     if (_undo.isEmpty || _ended) return;
-    final s = PState.restore(_undo.removeLast(), lv);
+    final raw = _undo.removeLast();
+    final cut = raw.indexOf('#');
+    final s = PState.restore(cut < 0 ? raw : raw.substring(0, cut), lv);
     if (s == null) return;
-    setState(() => st = s);
+    setState(() {
+      st = s;
+      _notes = _parseNotes(cut < 0 ? '' : raw.substring(cut + 1));
+    });
     _persist();
   }
 
   void _clear() {
     if (_ended) return;
     _push();
-    setState(() => st = kind.initial(lv));
+    setState(() {
+      st = kind.initial(lv);
+      _notes = List<int>.filled(lv.n, 0);
+    });
     _persist();
   }
 
@@ -479,7 +559,10 @@ class _PuzzleViewState extends State<PuzzleView> {
     setState(() {
       if (layer == 0) {
         st.cells[idx!] = lv.solCells[idx];
-        _sel = idx;
+        if (kind.cellInput == CellInput.digits) {
+          _sel = idx;
+          if (lv.solCells[idx] > 0) _placed(idx, lv.solCells[idx]);
+        }
       } else if (layer == 1) {
         st.links[idx!] = lv.solLinks[idx];
       } else {
@@ -499,8 +582,12 @@ class _PuzzleViewState extends State<PuzzleView> {
 
   Widget _build(BuildContext context, ColorScheme scheme) {
     final look = StudioLook.of(context);
+    final style = BoardStyle.of(widget.rules.gameId, kind.id, scheme.primary);
     final lang = ctx.lang;
-    final status = kind.status(lv, st, lang);
+    // Durum satırı boşsa zorluk adı gösterilir (Sudoku.com'daki gibi).
+    final own = kind.status(lv, st, lang);
+    final d = widget.rules.mapDifficulty(campaignDifficulty(ctx.spec));
+    final status = own.isNotEmpty ? own : bt(lang, d <= 2 ? 'easy' : (d <= 4 ? 'medium' : (d <= 7 ? 'hard' : 'expert')));
     final (mt, ml, mb, mr) = kind.margins(lv);
     final digits = kind.cellInput == CellInput.digits;
     final colors = kind.cellInput == CellInput.colors;
@@ -532,11 +619,48 @@ class _PuzzleViewState extends State<PuzzleView> {
         child: LayoutBuilder(builder: (context, box) {
           final cols = lv.w + ml + mr, rows = lv.h + mt + mb;
           final asp = kind.cellAspect(lv);
-          _cs = math.min((box.maxWidth - 16) / cols, (box.maxHeight - 16) / (rows * asp));
+          // Çerçeve payı (yarım hücre) tahtanın dışında kalır.
+          _cs = math.min((box.maxWidth - 16) / (cols + 0.6), (box.maxHeight - 16) / (rows * asp + 0.6));
           _csy = _cs * asp;
           final bw = _cs * cols, bh = _csy * rows;
           final left = (box.maxWidth - bw) / 2, top = (box.maxHeight - bh) / 2;
           _origin = Offset(left + ml * _cs, top + mt * _csy);
+          final stuck = !_ended && kind.stuck(lv, st);
+          return Stack(children: [
+            Positioned.fill(child: _board(scheme, style, lang, digits, box)),
+            if (stuck)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 8,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                    decoration: BoxDecoration(
+                      color: StudioLook.of(context).sheet.withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: StudioLook.of(context).accent, width: 1.4),
+                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10)],
+                    ),
+                    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 6, children: [
+                      Text(bt(lang, 'no_moves'), style: const TextStyle(color: kStudioText, fontWeight: FontWeight.w800)),
+                      _ToolKey(icon: Icons.undo, label: bt(lang, 'undo'), onTap: _undoMove),
+                      _ToolKey(icon: Icons.restart_alt, label: bt(lang, 'restart'), onTap: _clear),
+                    ]),
+                  ),
+                ),
+              ),
+          ]);
+        }),
+      ),
+      if (digits) _numberPad(scheme, style),
+      if (kind.fillMarkTools(lv)) _penRow(),
+      if (colors) _palette(scheme),
+      const SizedBox(height: 6),
+    ]);
+  }
+
+  Widget _board(ColorScheme scheme, BoardStyle style, String lang, bool digits, BoxConstraints box) {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (d) => _tapAt(d.localPosition),
@@ -568,56 +692,123 @@ class _PuzzleViewState extends State<PuzzleView> {
                 origin: _origin,
                 sel: digits ? _sel : null,
                 path: List.of(_path),
-                ink: scheme.onSurface,
-                accent: ctx.pieceColors.isNotEmpty ? ctx.pieceColors[0] : scheme.primary,
+                style: style,
+                ink: style.ink,
+                accent: style.accent ?? scheme.primary,
                 accent2: ctx.pieceColors.length > 1 ? ctx.pieceColors[1] : scheme.tertiary,
-                paper: Color.alphaBlend(scheme.surface.withValues(alpha: 0.94), const Color(0xFFF6EBD9)),
+                paper: style.paper,
+                notes: digits ? _notes : const [],
+                win: _win,
                 colorBlind: ctx.colorBlind,
                 lang: lang,
               ),
             ),
           );
-        }),
-      ),
-      if (digits) _numberPad(scheme),
-      if (colors) _palette(scheme),
-      const SizedBox(height: 6),
-    ]);
   }
 
-  Widget _numberPad(ColorScheme scheme) {
+  Widget _numberPad(ColorScheme scheme, BoardStyle style) {
     final max = kind.cellStates(lv) - 1;
     final values = kind.padValues(lv, st) ?? [for (var v = 1; v <= max; v++) v];
-    final w = values.length > 8 ? 34.0 : 44.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          for (final v in values)
-            _PadKey(
-              width: w,
-              onTap: () => _digit(v),
-              child: Text(kind.digitLabel(v),
-                  style: const TextStyle(color: kStudioText, fontSize: 20, fontWeight: FontWeight.w800)),
-            ),
-          _PadKey(
-            width: 44,
-            onTap: () {
-              final i = _sel;
-              if (i == null || _locked(i) || st.cells[i] == 0) return;
-              _push();
-              setState(() => st.cells[i] = 0);
-              _persist();
-            },
-            child: Icon(Icons.backspace_outlined, color: kStudioText, semanticLabel: bt(ctx.lang, 'erase')),
+    final notes = kind.notesFor(lv);
+    final quota = kind.digitQuota(lv);
+    final used = <int, int>{};
+    if (quota > 0) {
+      for (final v in st.cells) {
+        if (v > 0) used[v] = (used[v] ?? 0) + 1;
+      }
+    }
+    final selVal = _sel == null ? 0 : st.cells[_sel!];
+    Widget key(int v, {double? width}) {
+      final left = quota > 0 ? quota - (used[v] ?? 0) : -1;
+      return _PadKey(
+        width: width,
+        active: selVal == v,
+        done: left == 0,
+        onTap: () => _digit(v),
+        // Büyük yazıda (x1.3) tuşa sığsın diye ölçeklenir.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(kind.digitLabel(v),
+              style: TextStyle(
+                  color: kStudioText,
+                  fontSize: _noteMode && notes ? 17 : 22,
+                  fontWeight: _noteMode && notes ? FontWeight.w600 : FontWeight.w800,
+                  fontStyle: _noteMode && notes ? FontStyle.italic : FontStyle.normal)),
+          if (left > 0) Text('$left', style: const TextStyle(color: kStudioTextDim, fontSize: 10, height: 1)),
+          ]),
+        ),
+      );
+    }
+
+    final erase = _ToolKey(
+      icon: Icons.backspace_outlined,
+      label: bt(ctx.lang, 'erase'),
+      onTap: () {
+        final i = _sel;
+        if (i == null || _locked(i) || (st.cells[i] == 0 && _notes[i] == 0)) return;
+        _push();
+        setState(() {
+          st.cells[i] = 0;
+          _notes[i] = 0;
+        });
+        _persist();
+      },
+    );
+    final tools = Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        erase,
+        if (notes) ...[
+          const SizedBox(width: 10),
+          _ToolKey(
+            icon: Icons.edit_note,
+            label: bt(ctx.lang, 'notes'),
+            on: _noteMode,
+            onTap: () => setState(() => _noteMode = !_noteMode),
           ),
         ],
+      ]),
+    );
+    // Rakam sırası sağdan sola dillerde de 1→9 (sayı tuş takımı alışkanlığı).
+    final row = values.length <= 10
+        ? Row(textDirection: TextDirection.ltr, children: [
+            for (final v in values)
+              Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: key(v))),
+          ])
+        : Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
+            children: [for (final v in values) key(v, width: 40)],
+          );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [tools, row]),
       ),
     );
   }
+
+  Widget _penRow() => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _ToolKey(
+            icon: Icons.crop_square_rounded,
+            label: bt(ctx.lang, 'fill'),
+            on: _pen == 1,
+            onTap: () => setState(() => _pen = _pen == 1 ? 0 : 1),
+          ),
+          const SizedBox(width: 10),
+          _ToolKey(
+            icon: Icons.close_rounded,
+            label: bt(ctx.lang, 'mark'),
+            on: _pen == 2,
+            onTap: () => setState(() => _pen = _pen == 2 ? 0 : 2),
+          ),
+        ]),
+      );
 
   Widget _palette(ColorScheme scheme) {
     final n = kind.cellStates(lv);
@@ -646,11 +837,13 @@ class _PuzzleViewState extends State<PuzzleView> {
 }
 
 /// Rakam takımının tuşu: koyu degrade kare, vurgu kenarı, beyaz rakam.
+/// [done]: rakam ızgarada tamamlandı (soluk); [active]: seçili hücredeki rakam.
 class _PadKey extends StatelessWidget {
-  final double width;
+  final double? width;
   final VoidCallback onTap;
   final Widget child;
-  const _PadKey({required this.width, required this.onTap, required this.child});
+  final bool active, done;
+  const _PadKey({this.width, required this.onTap, required this.child, this.active = false, this.done = false});
 
   @override
   Widget build(BuildContext context) {
@@ -658,20 +851,65 @@ class _PadKey extends StatelessWidget {
     final r = BorderRadius.circular(12);
     return SizedBox(
       width: width,
-      height: 46,
+      height: 52,
+      child: Opacity(
+        opacity: done ? 0.38 : 1,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: r,
+          child: InkWell(
+            borderRadius: r,
+            onTap: onTap,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: r,
+                gradient: look.tile,
+                border: Border.all(color: look.accent.withValues(alpha: active ? 1 : 0.5), width: active ? 2.4 : 1.2),
+              ),
+              child: Center(child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Araç tuşu (sil, not): simge + kısa yazı; [on] açık durumu.
+class _ToolKey extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool? on;
+  const _ToolKey({required this.icon, required this.label, required this.onTap, this.on});
+
+  @override
+  Widget build(BuildContext context) {
+    final look = StudioLook.of(context);
+    final lit = on ?? false;
+    final r = BorderRadius.circular(20);
+    return Semantics(
+      button: true,
+      toggled: on,
+      label: label,
       child: Material(
         color: Colors.transparent,
-        borderRadius: r,
         child: InkWell(
           borderRadius: r,
           onTap: onTap,
           child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
               borderRadius: r,
-              gradient: look.tile,
-              border: Border.all(color: look.accent.withValues(alpha: 0.5), width: 1.2),
+              color: lit ? look.accent.withValues(alpha: 0.85) : look.sheet.withValues(alpha: 0.85),
+              border: Border.all(color: look.accent.withValues(alpha: 0.6), width: 1.2),
             ),
-            child: Center(child: child),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 20, color: kStudioText),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(color: kStudioText, fontWeight: FontWeight.w700, fontSize: 13)),
+            ]),
           ),
         ),
       ),
@@ -703,6 +941,9 @@ class _GridPainter extends CustomPainter {
   final int? sel;
   final List<int> path;
   final Color ink, accent, accent2, paper;
+  final BoardStyle style;
+  final List<int> notes;
+  final Animation<double> win;
   final bool colorBlind;
   final String lang;
 
@@ -719,9 +960,12 @@ class _GridPainter extends CustomPainter {
     required this.accent,
     required this.accent2,
     required this.paper,
+    required this.style,
+    required this.notes,
+    required this.win,
     required this.colorBlind,
     required this.lang,
-  });
+  }) : super(repaint: win);
 
   double get _cy => csy > 0 ? csy : cs;
   Rect cell(int i) => Rect.fromLTWH(origin.dx + (i % lv.w) * cs, origin.dy + (i ~/ lv.w) * _cy, cs, _cy);
@@ -735,17 +979,40 @@ class _GridPainter extends CustomPainter {
     if (pt + pl + pb + pr > 0) {
       // İpuçları koyu mürekkeple yazılır: koyu dünya arka planında da okunsun diye kenar şeridi açık zemin.
       final outer = Rect.fromLTRB(board.left - pl * cs, board.top - pt * _cy, board.right + pr * cs, board.bottom + pb * _cy);
-      c.drawRRect(RRect.fromRectAndRadius(outer.inflate(cs * 0.12), Radius.circular(cs * 0.25)), Paint()..color = paper.withValues(alpha: 0.9));
+      final strip = RRect.fromRectAndRadius(outer.inflate(cs * 0.12), Radius.circular(cs * 0.25));
+      c.drawRRect(strip.shift(Offset(0, math.max(2, cs * 0.05))), Paint()..color = const Color(0x26000000));
+      c.drawRRect(strip, Paint()..color = Color.lerp(style.paper, style.paper2, 0.5)!.withValues(alpha: 0.94));
+      c.drawRRect(
+          strip,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..color = style.frameColor.withValues(alpha: 0.45)
+            ..strokeWidth = 1.2);
     }
-    c.drawRRect(RRect.fromRectAndRadius(board.inflate(cs * 0.08), Radius.circular(cs * 0.18)), Paint()..color = paper);
+    style.paintBoard(c, board, cs, shadow: pt + pl + pb + pr == 0);
     // Bölge tonları
     if (kind.tintRegions && lv.regions.isNotEmpty) {
       for (var i = 0; i < lv.n; i++) {
         final t = regionTint(lv.regions[i]);
-        c.drawRect(cell(i), Paint()..color = t);
+        c.drawRect(cell(i), Paint()..color = t.withValues(alpha: kind.regionTintStrength));
       }
     }
-    if (sel != null) c.drawRect(cell(sel!), Paint()..color = accent.withValues(alpha: 0.22));
+    final s0 = sel;
+    if (s0 != null) {
+      // Seçili hücrenin satır/sütun/kutusu ve aynı rakamlar (Sudoku.com gibi).
+      final peerTint = Paint()..color = accent.withValues(alpha: 0.09);
+      for (final j in kind.digitPeers(lv, s0)) {
+        c.drawRect(cell(j), peerTint);
+      }
+      final v0 = st.cells[s0];
+      if (v0 > 0) {
+        final same = Paint()..color = accent.withValues(alpha: 0.20);
+        for (var j = 0; j < lv.n; j++) {
+          if (j != s0 && st.cells[j] == v0 && (lv.clues.isEmpty || lv.clues[j] < 0)) c.drawRect(cell(j), same);
+        }
+      }
+      c.drawRect(cell(s0), Paint()..color = accent.withValues(alpha: 0.30));
+    }
     kind.paintUnder(c, lv, st, cell, cs);
     // Hücre içerikleri
     for (var i = 0; i < lv.n; i++) {
@@ -753,6 +1020,7 @@ class _GridPainter extends CustomPainter {
       final r = cell(i);
       if (lk.color >= 0) c.drawRect(r.deflate(cs * 0.02), Paint()..color = puzzleColor(lk.color));
       paintMark(c, lk.mark, r, ink: ink, accent: accent, accent2: accent2, dir: lk.arrowDir);
+      if (lk.text.isEmpty && i < notes.length && notes[i] != 0) _paintNotes(c, r, notes[i]);
       if (lk.text.isNotEmpty) {
         final dark = lk.mark == Mark.fill || (lk.color > 0);
         final color = lk.tone == 2
@@ -849,7 +1117,7 @@ class _GridPainter extends CustomPainter {
         final color = kind.linkColor(lv, st, l) ?? accent;
         final p = Paint()
           ..color = color
-          ..strokeWidth = cs * (v == 2 ? 0.07 : 0.16)
+          ..strokeWidth = cs * (v == 2 ? 0.07 : kind.linkWidth)
           ..strokeCap = StrokeCap.round;
         if (v == 2) {
           final n = Offset(pb.dy - pa.dy, pa.dx - pb.dx);
@@ -912,6 +1180,46 @@ class _GridPainter extends CustomPainter {
         }
       }
     }
+    _paintWin(c, board);
+  }
+
+  /// Kalem notları: hücrede 3x3 küçük rakamlar; seçili rakam vurgulu.
+  void _paintNotes(Canvas c, Rect r, int mask) {
+    final hv = sel != null ? st.cells[sel!] : 0;
+    for (var v = 1; v <= 9; v++) {
+      if (mask & (1 << v) == 0) continue;
+      final col = (v - 1) % 3, row = (v - 1) ~/ 3;
+      final o = Offset(r.left + r.width * (col + 0.5) / 3, r.top + r.height * (row + 0.5) / 3);
+      if (v == hv) c.drawCircle(o, r.width * 0.15, Paint()..color = accent.withValues(alpha: 0.25));
+      _text(c, '$v', o, r.width * 0.24, ink.withValues(alpha: 0.72), v == hv ? FontWeight.w800 : FontWeight.w500);
+    }
+  }
+
+  /// Çözüm kutlaması: hücreler köşegen dalga hâlinde parlar, üstünden ışık geçer.
+  void _paintWin(Canvas c, Rect board) {
+    final t = win.value;
+    if (t <= 0 || t >= 1) return;
+    final span = (lv.w + lv.h).toDouble();
+    for (var i = 0; i < lv.n; i++) {
+      final d = ((i % lv.w) + (i ~/ lv.w)) / span;
+      final k = ((t * 1.6 - d) * 3).clamp(0.0, 1.0);
+      final a = math.sin(k * math.pi);
+      if (a <= 0.01) continue;
+      c.drawRRect(RRect.fromRectAndRadius(cell(i).deflate(cs * 0.06), Radius.circular(cs * 0.14)),
+          Paint()..color = accent.withValues(alpha: 0.28 * a));
+    }
+    final x = board.left - board.width * 0.4 + board.width * 1.8 * t;
+    c.save();
+    c.clipRect(board);
+    c.drawRect(
+        board,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: 0.55), Colors.white.withValues(alpha: 0)],
+          ).createShader(Rect.fromLTWH(x - board.width * 0.2, board.top, board.width * 0.4, board.height)));
+    c.restore();
   }
 
   void _text(Canvas c, String s, Offset center, double size, Color color, FontWeight w) {

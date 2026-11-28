@@ -321,6 +321,22 @@ abstract class PuzzleKind {
   /// Rakam düğmeleri (null: 1..en büyük).
   List<int>? padValues(PLevel lv, PState s) => null;
 
+  /// Rakam türlerinde [i] ile aynı rakamı alamayan hücreler: seçili hücrenin
+  /// satır/sütun/kutu vurgusu ve not temizleme için.
+  List<int> digitPeers(PLevel lv, int i) => const [];
+
+  /// Her rakam çözümde kaç kez geçer (0: sabit değil). Rakam takımında
+  /// kalan adet gösterilir (Sudoku, Futoshiki, Gökdelenler, Hesap Kutusu).
+  int digitQuota(PLevel lv) => 0;
+
+  /// Karalama bulmacalarında "doldur / işaretle" kalemi gösterilsin mi
+  /// (Nonogram.com gibi). Seçili değilken dokunma eskisi gibi döngüler.
+  bool fillMarkTools(PLevel lv) =>
+      cellInput == CellInput.cycle && markState >= 0 && cellStates(lv) == 3 && !usesLinks && !actionMode;
+
+  /// Kalem notu (aday rakamlar) kullanılabilir mi.
+  bool notesFor(PLevel lv) => cellInput == CellInput.digits && padValues(lv, PState.empty(lv)) == null && cellStates(lv) <= 10;
+
   List<int> cellDomain(PLevel lv, int i) => cellInput == CellInput.digits || zeroUnknown
       ? [for (var v = 1; v < cellStates(lv); v++) v]
       : [for (var v = 0; v < cellStates(lv); v++) if (v != markState) v];
@@ -369,6 +385,9 @@ abstract class PuzzleKind {
   /// Bölgeleri renkle ayır.
   bool get tintRegions => false;
 
+  /// Bölge tonunun yoğunluğu (renk bölgeleri asıl ipucu olan türlerde güçlü).
+  double get regionTintStrength => 0.2;
+
   /// Hücre çizgileri (ızgara) gösterilsin mi.
   bool get gridLines => true;
 
@@ -413,6 +432,10 @@ abstract class PuzzleKind {
   /// Kaybedildi mi (ör. mayına basmak).
   bool failed(PLevel lv, PState s) => false;
 
+  /// Yapılabilecek hamle kalmadı mı (ör. sıralama tüpleri kilitlendi).
+  /// Ekran "hamle kalmadı" uyarısı ve geri al / baştan düğmeleri gösterir.
+  bool stuck(PLevel lv, PState s) => false;
+
   /// Oyunun başlangıç durumu.
   PState initial(PLevel lv) => PState.empty(lv);
 
@@ -427,6 +450,9 @@ abstract class PuzzleKind {
 
   /// Kenar türlerinde köşe noktaları gösterilsin mi.
   bool get showVertices => usesBorders;
+
+  /// Bağ çizgisinin kalınlığı (hücre boyuna oranla).
+  double get linkWidth => 0.16;
 
   /// Bağ rengi (null: vurgu rengi).
   Color? linkColor(PLevel lv, PState s, int l) => null;
@@ -666,6 +692,9 @@ class PuzzleRules extends GameRules<PLevel> {
   /// Bölüm zorluğu için tür (ekranda kullanılır).
   PuzzleKind kindForLevel(int d) => kindFor(mapDifficulty(d));
 
+  /// Bölümün türü: kampanyanın ilk bölümlerindeki zorluk tabanı dahil.
+  PuzzleKind kindForSpec(LevelSpec spec) => kindFor(mapDifficulty(campaignDifficulty(spec)));
+
   @override
   int get levelCount => levels;
 
@@ -698,7 +727,7 @@ class PuzzleRules extends GameRules<PLevel> {
 
   @override
   PLevel generate(LevelSpec spec) {
-    final d = mapDifficulty(spec.difficulty);
+    final d = mapDifficulty(campaignDifficulty(spec));
     final k = kindFor(d);
     final r = SeededRandom(mixSeed([spec.seed, 7331]));
     final lv = k.make(d, r);
@@ -707,7 +736,7 @@ class PuzzleRules extends GameRules<PLevel> {
 
   @override
   Validation validate(PLevel puzzle, LevelSpec spec) {
-    final k = kindFor(mapDifficulty(spec.difficulty));
+    final k = kindFor(mapDifficulty(campaignDifficulty(spec)));
     final sol = PState(
       puzzle.solCells.isEmpty ? List.filled(puzzle.n, 0) : List.of(puzzle.solCells),
       puzzle.solLinks.isEmpty ? List.filled(puzzle.linkCount, 0) : List.of(puzzle.solLinks),
@@ -726,6 +755,19 @@ class PuzzleRules extends GameRules<PLevel> {
     }
     return Validation.ok(empty);
   }
+}
+
+/// Kampanya zorluğu. Bölüm planı ilk 20 bölümü en kolay düzeyde tutar; bu
+/// piyasadaki örneklerle (Sudoku.com, Nonogram.com, Water Sort) karşılaştırınca
+/// çok düz kalır: oyuncu 4x4 Sudoku'yu 20 kez çözer. Taban: 1. bölüm en kolay
+/// (öğretici), 2–3 kolay, 4–8 orta-kolay, 9. bölümden sonra en az 4. düzey.
+/// Bölüm planının sonraki yükselişi (500. bölüm ≈ 7, 50.000. ≈ 10) aynen kalır.
+int campaignDifficulty(LevelSpec spec) {
+  final d = spec.difficulty;
+  if (spec.mode != GameModeId.campaign) return d;
+  final l = spec.levelId;
+  final floor = l <= 1 ? 1 : (l <= 3 ? 2 : (l <= 8 ? 3 : 4));
+  return d < floor ? floor : d;
 }
 
 /// Rastgele permütasyon.

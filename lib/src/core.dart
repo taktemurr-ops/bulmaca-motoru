@@ -329,6 +329,11 @@ abstract class PuzzleKind {
   /// kalan adet gösterilir (Sudoku, Futoshiki, Gökdelenler, Hesap Kutusu).
   int digitQuota(PLevel lv) => 0;
 
+  /// Karalama bulmacalarında "doldur / işaretle" kalemi gösterilsin mi
+  /// (Nonogram.com gibi). Seçili değilken dokunma eskisi gibi döngüler.
+  bool fillMarkTools(PLevel lv) =>
+      cellInput == CellInput.cycle && markState >= 0 && cellStates(lv) == 3 && !usesLinks && !actionMode;
+
   /// Kalem notu (aday rakamlar) kullanılabilir mi.
   bool notesFor(PLevel lv) => cellInput == CellInput.digits && padValues(lv, PState.empty(lv)) == null && cellStates(lv) <= 10;
 

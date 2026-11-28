@@ -473,6 +473,9 @@ class AquariumKind extends ShadeKind {
   String outside(PLevel lv, PState s, int side, int index) => side == 0 ? '${lv.extra[1][index]}' : (side == 1 ? '${lv.extra[0][index]}' : '');
 
   @override
+  bool fillMarkTools(PLevel lv) => false;
+
+  @override
   void onTap(PLevel lv, PState s, int i) {
     // Dokunulan hücreye kadar akvaryumu doldur/boşalt
     final y = i ~/ lv.w;

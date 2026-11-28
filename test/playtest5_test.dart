@@ -136,4 +136,31 @@ void main() {
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 2));
   });
+
+  testWidgets('Nonogram: doldur/işaretle kalemi ve mayın sonrası devam teklifi hatasız', (t) async {
+    t.view.physicalSize = const Size(1080, 2340);
+    t.view.devicePixelRatio = 2.75;
+    addTearDown(t.view.reset);
+    for (final id in const ['nonogram', 'mayin-tarlasi', 'hitori']) {
+      final rules = gridRules('oyun-$id', id);
+      final planner = LevelPlanner(gameId: rules.gameId, optionalMechanics: const []);
+      final gl = rules.build(planner.spec(5));
+      await t.pumpWidget(_host(PuzzleView(key: ValueKey(id), ctx: _ctx(gl), rules: rules)));
+      await t.pump(const Duration(milliseconds: 300));
+      if (id != 'mayin-tarlasi') {
+        expect(find.byIcon(Icons.close_rounded), findsOneWidget, reason: id);
+        await t.tap(find.byIcon(Icons.close_rounded));
+        await t.pump();
+      }
+      final size = t.view.physicalSize / t.view.devicePixelRatio;
+      for (var k = 0; k < 12; k++) {
+        await t.tapAt(Offset(size.width * (0.2 + 0.05 * k), size.height * (0.3 + 0.03 * k)));
+        await t.pump(const Duration(milliseconds: 100));
+      }
+      await t.pump(const Duration(seconds: 2));
+      expect(t.takeException(), isNull, reason: id);
+    }
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 2));
+  });
 }

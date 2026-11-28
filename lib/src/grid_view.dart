@@ -39,6 +39,8 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
   // kalem notları (aday rakamlar, bit maskesi) ve not kipi
   late List<int> _notes;
   bool _noteMode = false;
+  // karalama kalemi: 0 döngü, 1 doldur, 2 işaretle
+  int _pen = 0;
   // çözüm kutlaması
   late final AnimationController _win = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
 
@@ -98,8 +100,17 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
     if (kind.failed(lv, st)) {
       _ended = true;
       ctx.sfx(Sfx.lose);
-      Future.delayed(const Duration(milliseconds: 700), () {
+      Future.delayed(const Duration(milliseconds: 700), () async {
         if (!mounted) return;
+        // Piyasadaki örneklerdeki gibi "devam et" teklifi (reklam/jeton):
+        // kabul edilirse son hamle geri alınır ve oyun sürer.
+        final more = await ctx.requestContinue();
+        if (!mounted) return;
+        if (more && _undo.isNotEmpty) {
+          _ended = false;
+          _undoMove();
+          return;
+        }
         ctx.finish(RoundResult(won: false, seconds: _seconds, moves: _moves, hintsUsed: _hints));
       });
       return;
@@ -296,11 +307,21 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
         _changed();
       case CellInput.cycle:
         _push();
-        setState(() => kind.onTap(lv, st, i));
+        setState(() => _cycleTap(i));
         ctx.sfx(Sfx.place);
         _changed();
       case CellInput.none:
         break;
+    }
+  }
+
+  /// Döngülü hücre dokunuşu: kalem seçiliyse doldur/işaretle, yoksa türün döngüsü.
+  void _cycleTap(int i) {
+    if (_pen != 0 && kind.fillMarkTools(lv)) {
+      final v = _pen == 1 ? 1 : kind.markState;
+      st.cells[i] = st.cells[i] == v ? 0 : v;
+    } else {
+      kind.onTap(lv, st, i);
     }
   }
 
@@ -380,7 +401,7 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
     _paintValue = null;
     if (i != null && kind.cellInput == CellInput.cycle && !kind.dragLinks && kind.tapCell(lv, i)) {
       _push();
-      setState(() => kind.onTap(lv, st, i));
+      setState(() => _cycleTap(i));
       _paintValue = st.cells[i];
       _dragged = true;
     } else if (i != null && kind.cellInput == CellInput.colors && kind.tapCell(lv, i)) {
@@ -643,6 +664,7 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
         }),
       ),
       if (digits) _numberPad(scheme, style),
+      if (kind.fillMarkTools(lv)) _penRow(),
       if (colors) _palette(scheme),
       const SizedBox(height: 6),
     ]);
@@ -727,6 +749,25 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
       ),
     );
   }
+
+  Widget _penRow() => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _ToolKey(
+            icon: Icons.crop_square_rounded,
+            label: bt(ctx.lang, 'fill'),
+            on: _pen == 1,
+            onTap: () => setState(() => _pen = _pen == 1 ? 0 : 1),
+          ),
+          const SizedBox(width: 10),
+          _ToolKey(
+            icon: Icons.close_rounded,
+            label: bt(ctx.lang, 'mark'),
+            on: _pen == 2,
+            onTap: () => setState(() => _pen = _pen == 2 ? 0 : 2),
+          ),
+        ]),
+      );
 
   Widget _palette(ColorScheme scheme) {
     final n = kind.cellStates(lv);

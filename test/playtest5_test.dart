@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:bulmaca_motoru/bulmaca_motoru.dart';
 import 'package:bulmaca_motoru/src/board_style.dart';
+import 'package:bulmaca_motoru/src/studio_chrome.dart';
 import 'package:studio_core/app/game_api.dart';
 import 'package:studio_core/core/game_rules.dart';
 import 'package:studio_core/core/level_plan.dart';

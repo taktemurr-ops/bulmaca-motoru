@@ -363,12 +363,18 @@ class BoardStyle {
 
   void _paintTape(Canvas c, Rect r, double cs) {
     final tw = math.max(28.0, cs * 1.1), th = math.max(10.0, cs * 0.34);
-    final p = Paint()..color = (accent ?? frameColor).withValues(alpha: 0.38);
+    // Kâğıt bant: yarı saydam krem (vurgu rengi okun gibi görünüyordu).
+    final p = Paint()..color = const Color(0xB8F4E9CF);
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0x33000000);
     for (final (o, a) in [(r.topLeft, -0.6), (r.topRight, 0.6), (r.bottomLeft, 0.6), (r.bottomRight, -0.6)]) {
       c.save();
       c.translate(o.dx, o.dy);
       c.rotate(a);
       c.drawRect(Rect.fromCenter(center: Offset.zero, width: tw, height: th), p);
+      c.drawRect(Rect.fromCenter(center: Offset.zero, width: tw, height: th), edge);
       c.restore();
     }
   }

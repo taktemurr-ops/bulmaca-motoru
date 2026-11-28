@@ -66,6 +66,20 @@ class SortKind extends MoveKind {
   }
 
   @override
+  bool stuck(PLevel lv, PState s) {
+    if (solved(lv, s)) return false;
+    final t = tubes(s.cells, lv.w, lv.h);
+    for (var a = 0; a < t.length; a++) {
+      for (var b = 0; b < t.length; b++) {
+        if (a == b) continue;
+        final copy = [for (final x in t) List.of(x)];
+        if (move(copy, a, b, lv.h, mode, lv.w)) return false;
+      }
+    }
+    return true;
+  }
+
+  @override
   bool act(PLevel lv, PState s, int i) {
     final x = i % lv.w;
     final sel = s.aux[0];

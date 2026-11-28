@@ -432,6 +432,10 @@ abstract class PuzzleKind {
   /// Kaybedildi mi (ör. mayına basmak).
   bool failed(PLevel lv, PState s) => false;
 
+  /// Yapılabilecek hamle kalmadı mı (ör. sıralama tüpleri kilitlendi).
+  /// Ekran "hamle kalmadı" uyarısı ve geri al / baştan düğmeleri gösterir.
+  bool stuck(PLevel lv, PState s) => false;
+
   /// Oyunun başlangıç durumu.
   PState initial(PLevel lv) => PState.empty(lv);
 

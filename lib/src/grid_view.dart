@@ -618,6 +618,42 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
           final bw = _cs * cols, bh = _csy * rows;
           final left = (box.maxWidth - bw) / 2, top = (box.maxHeight - bh) / 2;
           _origin = Offset(left + ml * _cs, top + mt * _csy);
+          final stuck = !_ended && kind.stuck(lv, st);
+          return Stack(children: [
+            Positioned.fill(child: _board(scheme, style, lang, digits, box)),
+            if (stuck)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 8,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                    decoration: BoxDecoration(
+                      color: StudioLook.of(context).sheet.withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: StudioLook.of(context).accent, width: 1.4),
+                      boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10)],
+                    ),
+                    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 6, children: [
+                      Text(bt(lang, 'no_moves'), style: const TextStyle(color: kStudioText, fontWeight: FontWeight.w800)),
+                      _ToolKey(icon: Icons.undo, label: bt(lang, 'undo'), onTap: _undoMove),
+                      _ToolKey(icon: Icons.restart_alt, label: bt(lang, 'restart'), onTap: _clear),
+                    ]),
+                  ),
+                ),
+              ),
+          ]);
+        }),
+      ),
+      if (digits) _numberPad(scheme, style),
+      if (kind.fillMarkTools(lv)) _penRow(),
+      if (colors) _palette(scheme),
+      const SizedBox(height: 6),
+    ]);
+  }
+
+  Widget _board(ColorScheme scheme, BoardStyle style, String lang, bool digits, BoxConstraints box) {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (d) => _tapAt(d.localPosition),
@@ -661,13 +697,6 @@ class _PuzzleViewState extends State<PuzzleView> with SingleTickerProviderStateM
               ),
             ),
           );
-        }),
-      ),
-      if (digits) _numberPad(scheme, style),
-      if (kind.fillMarkTools(lv)) _penRow(),
-      if (colors) _palette(scheme),
-      const SizedBox(height: 6),
-    ]);
   }
 
   Widget _numberPad(ColorScheme scheme, BoardStyle style) {
